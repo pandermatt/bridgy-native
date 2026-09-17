@@ -1,3 +1,4 @@
+import BridgyEngine
 import SwiftUI
 
 @main
@@ -33,5 +34,22 @@ struct BridgyApp: App {
         .defaultSize(width: 980, height: 760)
         .windowResizability(.contentMinSize)
         #endif
+
+        #if os(visionOS)
+        ImmersiveSpace(id: BridgyApp.tableSpace) {
+            ImmersiveBoardView(
+                board: Board(size: model.configuration.size),
+                theme: model.settings.theme,
+                style: model.settings.boardStyle
+            )
+            .environment(model)
+        }
+        .immersionStyle(selection: .constant(.mixed), in: .mixed)
+        #endif
     }
+
+    #if os(visionOS)
+    /// The board-on-a-table space, opened from the Play tab.
+    static let tableSpace = "bridgy.table"
+    #endif
 }

@@ -9,6 +9,9 @@ struct AppRoot: View {
     @State private var showingWelcome = false
     @State private var tab: AppTab = .play
     @State private var boardSide: CGFloat = 320
+    #if os(visionOS)
+    @Environment(\.openImmersiveSpace) private var openImmersiveSpace
+    #endif
 
     var body: some View {
             TabView(selection: tabSelection) {
@@ -45,6 +48,15 @@ struct AppRoot: View {
                 // First launch only. Bridg-It is obscure enough that landing
                 // straight on a lattice of dots explains nothing.
                 if !model.settings.hasSeenWelcome { showingWelcome = true }
+                #if os(visionOS)
+                // The visionOS simulator takes gaze and pinch, not taps, so
+                // there is no way to press the button from a script. This lets
+                // a launch open the table directly:
+                //   simctl launch <device> <bundle> -BridgyOpenTable YES
+                if UserDefaults.standard.bool(forKey: "BridgyOpenTable") {
+                    await openImmersiveSpace(id: BridgyApp.tableSpace)
+                }
+                #endif
             }
     }
 

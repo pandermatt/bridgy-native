@@ -11,6 +11,9 @@ struct SetupScreen: View {
     @Environment(\.availableBoardSide) private var availableBoardSide
     @State private var configuration = GameConfiguration.default
     @State private var hasLoaded = false
+    #if os(visionOS)
+    @Environment(\.openImmersiveSpace) private var openImmersiveSpace
+    #endif
 
     private var maximumSize: Int {
         BoardSizeLimit.maximumSize(for: configuration, side: availableBoardSide)
@@ -63,6 +66,18 @@ struct SetupScreen: View {
                     WatchPaceControls(pace: $settings.watchPace)
                 }
             }
+
+            #if os(visionOS)
+            Section {
+                Button {
+                    Task { await openImmersiveSpace(id: BridgyApp.tableSpace) }
+                } label: {
+                    Label("Play on a Table", systemImage: "square.3.layers.3d")
+                }
+            } footer: {
+                Text("Puts the board in the room in front of you.")
+            }
+            #endif
 
             Section {
                 Button {

@@ -52,4 +52,10 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations[sdk=iphone*]: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad[sdk=iphone*]: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         ENABLE_HARDENED_RUNTIME[sdk=macosx*]: YES
+        # An immersive space is a second scene, and visionOS refuses to open one
+        # without UIApplicationSupportsMultipleScenes. There is no
+        # INFOPLIST_KEY_ alias for that — setting one is silently ignored — so
+        # visionOS gets a real plist, merged with the generated keys. Scoped by
+        # SDK so iPad multi-window behaviour is left alone.
+        INFOPLIST_FILE[sdk=xr*]: Support/VisionInfo.plist
         CODE_SIGN_IDENTITY[sdk=macosx*]: "-"

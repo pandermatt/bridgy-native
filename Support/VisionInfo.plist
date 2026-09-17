@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+		An immersive space is a second scene, and visionOS refuses to open one
+		unless the app declares it can show more than one at a time.
+
+		This lives in a real plist rather than a build setting because there is
+		no INFOPLIST_KEY_ alias for it — setting
+		INFOPLIST_KEY_UIApplicationSupportsMultipleScenes is silently ignored.
+		Everything else still comes from GENERATE_INFOPLIST_FILE and merges on
+		top of this, and INFOPLIST_FILE is scoped to visionOS so iPad
+		multi-window behaviour is left alone.
+	-->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<true/>
+	</dict>
+</dict>
+</plist>
