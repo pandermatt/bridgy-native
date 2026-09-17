@@ -7,58 +7,65 @@ struct GameScreen: View {
     @Environment(AppModel.self) private var model
     @State private var showingResult = false
 
+    private var isWatching: Bool { session.configuration.isWatchOnly }
+
     var body: some View {
         @Bindable var settings = model.settings
-        VStack(spacing: 16) {
-            ZoomableBoard(enabled: session.board.size > 12) {
-                BoardView(session: session, settings: model.settings)
+        return content(settings: $settings)
+            .padding(.horizontal)
+            .padding(.top, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            .navigationTitle(session.statusText)
+            .navigationSubtitle(subtitle)
+            .toolbar { actions }
+            .gameScreenTitleDisplayMode()
+            .modifier(GameFeedback(session: session, settings: model.settings, isWatching: isWatching))
+            .onAppear { session.begin() }
+            .onDisappear { session.stop() }
+            .onChange(of: session.state.winner) { _, winner in showingResult = winner != nil }
+            .onChange(of: model.settings.watchPace) { _, _ in session.paceChanged() }
+            .sheet(isPresented: $showingResult) {
+                ResultSheet(
+                    state: session.state,
+                    configuration: session.configuration,
+                    theme: model.settings.theme,
+                    style: $settings.boardStyle,
+                    onPlayAgain: { session.restart() },
+                    onChangeSetup: { model.session = nil }
+                )
             }
+    }
 
+    @ViewBuilder
+    private func content(settings: Bindable<AppSettings>) -> some View {
+        VStack(spacing: 16) {
+            board
             if model.settings.showHints, !session.state.isOver {
                 hintLine
             }
-
-            if session.configuration.isWatchOnly {
-                Form { WatchPaceControls(pace: $settings.watchPace) }
-                    .formStyle(.grouped)
-                    .frame(maxHeight: 220)
-                    .scrollDisabled(true)
+            if isWatching {
+                paceControls(settings: settings)
             }
         }
-        .padding(.horizontal)
-        .padding(.top, 8)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        .navigationTitle(session.statusText)
-        .navigationSubtitle(subtitle)
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .toolbar { actions }
-        .sensoryFeedback(trigger: session.state.moveCount) { _, _ in
-            model.settings.hapticsEnabled ? .impact(weight: .light, intensity: 0.7) : nil
+    }
+
+    private var board: some View {
+        ZoomableBoard(enabled: session.board.size > 12) {
+            BoardView(session: session, settings: model.settings)
         }
-        .sensoryFeedback(trigger: session.state.winner) { _, winner in
-            model.settings.hapticsEnabled && winner != nil ? .success : nil
-        }
-        .onAppear { session.begin() }
-        .onDisappear { session.stop() }
-        .onChange(of: session.state.winner) { _, winner in showingResult = winner != nil }
-        .onChange(of: model.settings.watchPace) { _, _ in session.paceChanged() }
-        .alert(resultTitle, isPresented: $showingResult) {
-            Button("Play Again") { session.restart() }
-            Button("Change Setup") { model.session = nil }
-            Button("Close", role: .cancel) {}
-        } message: {
-            Text("\(session.state.moveCount) moves.")
-        }
+        // Animating a board that changes fifteen times a second just stacks
+        // superseded animations on top of an O(n²) redraw.
+        .animation(isWatching ? nil : .smooth(duration: 0.18), value: session.state.moveCount)
     }
 
     private var subtitle: String {
         var parts = ["\(session.state.moveCount) moves"]
-        if session.configuration.isWatchOnly, session.isPaused { parts.append("paused") }
+        if isWatching, session.isPaused { parts.append("paused") }
         return parts.joined(separator: " · ")
     }
 
+    /// Reads the session's cached figures. Computing them here is what used to
+    /// put two breadth-first searches in the render path.
     private var hintLine: some View {
         HStack(spacing: 16) {
             ForEach(Player.allCases, id: \.self) { player in
@@ -66,34 +73,83 @@ struct GameScreen: View {
                     Text(movesLabel(for: player))
                 } icon: {
                     Image(systemName: player.symbolName)
-                        .foregroundStyle(model.settings.colorway.color(for: player))
+                        .foregroundStyle(model.settings.theme.color(for: player))
                 }
                 .font(.footnote)
             }
         }
         .foregroundStyle(.secondary)
+        .opacity(session.readout.isStale ? 0.5 : 1)
     }
 
     private func movesLabel(for player: Player) -> String {
-        guard let moves = session.movesToWin(for: player) else { return "\(player.displayName) cut off" }
-        return "\(player.displayName) needs \(moves)"
+        let needed = player == .blue ? session.readout.blue : session.readout.red
+        guard let needed else { return "\(player.displayName) cut off" }
+        return "\(player.displayName) needs \(needed)"
+    }
+
+    // MARK: - Pace
+
+    private func paceControls(settings: Bindable<AppSettings>) -> some View {
+        VStack(spacing: 8) {
+            HStack {
+                Text("Pace").font(.subheadline)
+                Spacer()
+                Text(paceLabel)
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            Slider(
+                value: Binding(
+                    get: { settings.wrappedValue.watchPace.sliderPosition },
+                    set: { settings.wrappedValue.watchPace.sliderPosition = $0 }
+                ),
+                in: WatchPace.sliderRange
+            ) {
+                Text("Pace")
+            } minimumValueLabel: {
+                Image(systemName: "tortoise")
+            } maximumValueLabel: {
+                Image(systemName: "hare")
+            }
+            .labelsHidden()
+
+            Toggle("Let engines think fully", isOn: settings.watchPace.allowsFullThinking)
+                .font(.subheadline)
+        }
+        .padding(.bottom, 4)
+    }
+
+    /// Honest about the rate actually being managed when the engines cannot keep
+    /// up with the ask.
+    private var paceLabel: String {
+        let requested = model.settings.watchPace
+        guard let achieved = session.achievedMovesPerSecond,
+              achieved < requested.movesPerSecond * 0.8 else {
+            return requested.rateDescription
+        }
+        return String(format: "%@ · managing %.1f", requested.rateDescription, achieved)
     }
 
     // MARK: - Toolbar
 
-    /// The board lives inside a tab, and a bottom bar would fight the tab bar
-    /// for the same strip of screen, so everything goes in the navigation bar:
-    /// the one or two actions you reach for constantly, and the rest behind an
-    /// overflow menu.
+    /// Watch mode gets a media transport. "Restart" tucked in a menu is not what
+    /// someone reaching for "stop" is looking for.
     @ToolbarContentBuilder
     private var actions: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
-            if session.configuration.isWatchOnly {
+            if isWatching {
                 Button {
                     session.togglePause()
                 } label: {
                     Label(session.isPaused ? "Play" : "Pause",
                           systemImage: session.isPaused ? "play.fill" : "pause.fill")
+                }
+                Button {
+                    session.finish()
+                    model.session = nil
+                } label: {
+                    Label("Stop", systemImage: "stop.fill")
                 }
             } else {
                 Button { session.undo() } label: {
@@ -105,26 +161,19 @@ struct GameScreen: View {
                     Label("Hint", systemImage: "lightbulb")
                 }
                 .disabled(!session.isHumanTurn)
-            }
 
-            Menu {
-                Button { session.restart() } label: {
-                    Label("Restart", systemImage: "arrow.clockwise")
+                Menu {
+                    Button { session.restart() } label: {
+                        Label("Restart", systemImage: "arrow.clockwise")
+                    }
+                    Button { model.session = nil } label: {
+                        Label("New Game", systemImage: "plus")
+                    }
+                } label: {
+                    Label("More", systemImage: "ellipsis")
                 }
-                Button { model.session = nil } label: {
-                    Label("New Game", systemImage: "plus")
-                }
-            } label: {
-                Label("More", systemImage: "ellipsis")
             }
         }
-    }
-
-    private var resultTitle: String {
-        guard let winner = session.state.winner else { return "Game Over" }
-        if session.configuration.soloHumanPlayer == winner { return "You Win" }
-        if session.configuration.soloHumanPlayer != nil { return "\(winner.displayName) Wins" }
-        return "\(winner.displayName) Wins"
     }
 }
 
@@ -154,5 +203,38 @@ struct ZoomableBoard<Content: View>: View {
         } else {
             content
         }
+    }
+}
+
+
+/// Haptics, kept out of the body so the type checker has less to chew on.
+private struct GameFeedback: ViewModifier {
+    let session: GameSession
+    let settings: AppSettings
+    let isWatching: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .sensoryFeedback(trigger: session.state.moveCount) { _, _ in
+                // Not while two computers play: a haptic fifteen times a second
+                // is a vibration, not feedback.
+                settings.hapticsEnabled && !isWatching
+                    ? .impact(weight: .light, intensity: 0.7)
+                    : nil
+            }
+            .sensoryFeedback(trigger: session.state.winner) { _, winner in
+                settings.hapticsEnabled && winner != nil ? .success : nil
+            }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func gameScreenTitleDisplayMode() -> some View {
+        #if os(iOS)
+        navigationBarTitleDisplayMode(.inline)
+        #else
+        self
+        #endif
     }
 }

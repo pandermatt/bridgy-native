@@ -68,10 +68,18 @@ struct SetupScreen: View {
                 Button {
                     model.startGame(configuration)
                 } label: {
-                    Text(configuration.isWatchOnly ? "Watch" : "Start")
-                        .frame(maxWidth: .infinity)
+                    Label(
+                        configuration.isWatchOnly ? "Watch" : "Start",
+                        systemImage: "play.fill"
+                    )
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
+                // Tinted to whoever moves first, so the button belongs to the game
+                // rather than sitting on top of it.
+                .tint(model.settings.theme.color(for: .blue))
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
             }
@@ -107,7 +115,8 @@ struct SetupScreen: View {
     }
 
     private func seatSection(for player: Player) -> some View {
-        Section {
+        let colour = model.settings.theme.color(for: player)
+        return Section {
             Picker(selection: binding(for: player)) {
                 Label("You", systemImage: "person").tag(Seat.human)
                 ForEach(Difficulty.allCases) { level in
@@ -115,7 +124,11 @@ struct SetupScreen: View {
                         .tag(Seat.computer(level))
                 }
             } label: {
-                Text("Played by")
+                Label {
+                    Text("Played by")
+                } icon: {
+                    Image(systemName: player.symbolName).foregroundStyle(colour)
+                }
             }
             .pickerStyle(.menu)
 
@@ -130,7 +143,10 @@ struct SetupScreen: View {
                 }
             }
         } header: {
-            HStack {
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(colour)
+                    .frame(width: 10, height: 10)
                 Text(player.displayName)
                 Spacer()
                 Text(player.goalDescription).textCase(nil)

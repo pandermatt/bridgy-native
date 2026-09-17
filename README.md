@@ -32,6 +32,13 @@ board graph — a special case of Lehman's 1964 result on the Shannon switching
 game. The Perfect engine implements it and cannot be beaten when it moves first.
 (Playing second it falls back to search, because second player provably loses.)
 
+## Board styles
+
+The board draws in one of five styles, which apply both on screen and to the
+image a finished game can be shared as: every dot, only the dots a bridge has
+joined, lines alone, bold, or neon. Six colour themes set the two player
+colours; three of them stay distinguishable with colour vision deficiency.
+
 ## Layout
 
 - `BridgyEngine/` — the rules, board geometry and all AI, as a platform-agnostic

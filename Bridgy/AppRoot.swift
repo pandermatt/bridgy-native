@@ -5,6 +5,9 @@ import SwiftUI
 /// `.sidebarAdaptable` makes this a tab bar on iPhone and a sidebar on iPad and
 /// Mac, which replaces the size-class branch this used to carry.
 struct AppRoot: View {
+    @Environment(AppModel.self) private var model
+    @State private var showingWelcome = false
+
     var body: some View {
         GeometryReader { proxy in
             TabView {
@@ -26,6 +29,15 @@ struct AppRoot: View {
             #if os(iOS)
             .tabBarMinimizeBehavior(.onScrollDown)
             #endif
+            .welcomeCover(isPresented: $showingWelcome) {
+                model.settings.hasSeenWelcome = true
+                showingWelcome = false
+            }
+            .task {
+                // First launch only. Bridg-It is obscure enough that landing
+                // straight on a lattice of dots explains nothing.
+                if !model.settings.hasSeenWelcome { showingWelcome = true }
+            }
         }
     }
 
@@ -48,5 +60,22 @@ struct PlayTab: View {
                 SetupScreen()
             }
         }
+    }
+}
+
+
+private extension View {
+    /// A full-screen cover on iOS, a sheet on macOS, which has no such thing.
+    @ViewBuilder
+    func welcomeCover(isPresented: Binding<Bool>, onContinue: @escaping () -> Void) -> some View {
+        #if os(iOS)
+        fullScreenCover(isPresented: isPresented) {
+            WelcomeScreen(onContinue: onContinue)
+        }
+        #else
+        sheet(isPresented: isPresented) {
+            WelcomeScreen(onContinue: onContinue).frame(minWidth: 460, minHeight: 560)
+        }
+        #endif
     }
 }

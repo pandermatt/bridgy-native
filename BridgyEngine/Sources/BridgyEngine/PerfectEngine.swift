@@ -1,3 +1,5 @@
+import Synchronization
+
 /// Blue's winning pairing strategy, maintained move by move.
 ///
 /// Contract blue's top row to one node and its bottom row to another. The
@@ -135,6 +137,9 @@ struct PairingStrategy {
 public struct PerfectEngine: Engine {
 
     public let fallback: any Engine
+    /// Shared by every copy of this value, which is the point — the session holds
+    /// one engine for the game and the pairing survives across its turns.
+    private let cache = PairingCache()
 
     public init(fallback: any Engine = ShortestPathEngine(strategy: .balanced, tieBreak: .avoidConnection)) {
         self.fallback = fallback
@@ -160,30 +165,88 @@ public struct PerfectEngine: Engine {
         return move
     }
 
-    /// Replays the pairing from the opening. The strategy is stateful, but the
-    /// state is a pure function of the move history, so the engine stays a value.
+    /// The pairing advanced to this position, reusing the cache when the game has
+    /// simply continued.
     func perfectMove(in state: GameState) -> Move? {
         guard state.current == .blue, state.moves.count % 2 == 0 else { return nil }
-        let board = state.board
         if state.moves.isEmpty { return PairingStrategy.opening }
         guard state.moves[0] == PairingStrategy.opening else { return nil }
-        guard var pairing = PairingStrategy(board: board) else { return nil }
+        return cache.reply(board: state.board, history: state.moves)
+    }
+}
 
-        var index = 1
-        var reply: Move?
-        while index < state.moves.count {
-            let theirCell = board.index(of: state.moves[index])
-            guard let answer = pairing.respond(to: theirCell) else { return nil }
-            let answerMove = board.move(at: answer)
-            if index + 1 < state.moves.count {
-                // Blue departed from the strategy at some point, so the pairing
-                // no longer describes this position.
-                guard state.moves[index + 1] == answerMove else { return nil }
+/// Carries the pairing between turns.
+///
+/// The strategy is genuinely stateful — each reply depends on every reply before
+/// it — but `Engine` is a value type, so the original derived it from scratch on
+/// every call: a full spanning-tree pack plus a replay of the whole game. That is
+/// Θ(n⁴) per move with a Θ(n⁶) tail over a game, which is fine at one move per
+/// second and hopeless at fifteen.
+///
+/// This keeps the strategy alive between calls and feeds it only what is new. The
+/// from-scratch path remains as the fallback whenever the position is not a
+/// continuation of what the cache has seen — after an undo, a restart, or a blue
+/// move that departed from the strategy — so behaviour is unchanged.
+final class PairingCache: Sendable {
+
+    private struct Entry {
+        var board: Board
+        var strategy: PairingStrategy
+        /// History already fed to `strategy`, and verified against it.
+        var consumed: [Move]
+        /// Blue's answer to the last opponent move, not yet seen played.
+        var pendingReply: Move?
+    }
+
+    private let storage = Mutex<Entry?>(nil)
+
+    /// Blue's move in this position, or `nil` if no pairing describes it.
+    func reply(board: Board, history: [Move]) -> Move? {
+        storage.withLock { entry in
+            var strategy: PairingStrategy
+            var consumed: [Move]
+            var reply: Move?
+
+            if let existing = entry,
+               existing.board == board,
+               history.starts(with: existing.consumed) {
+                strategy = existing.strategy
+                consumed = existing.consumed
+                reply = existing.pendingReply
             } else {
-                reply = answerMove
+                guard let fresh = PairingStrategy(board: board) else { return nil }
+                strategy = fresh
+                consumed = [PairingStrategy.opening]
+                reply = nil
+                guard history.starts(with: consumed) else { return nil }
             }
-            index += 2
+
+            // Even indices are blue's, odd are the opponent's. Blue's own moves are
+            // only checked: if one is not what the pairing said to play, the
+            // position has drifted and no pairing describes it.
+            var index = consumed.count
+            while index < history.count {
+                if index.isMultiple(of: 2) {
+                    guard let expected = reply, history[index] == expected else { return nil }
+                    consumed.append(history[index])
+                    reply = nil
+                } else {
+                    guard let answer = strategy.respond(to: board.index(of: history[index])) else {
+                        return nil
+                    }
+                    consumed.append(history[index])
+                    reply = board.move(at: answer)
+                }
+                index += 1
+            }
+
+            entry = Entry(
+                board: board,
+                strategy: strategy,
+                consumed: consumed,
+                pendingReply: reply
+            )
+            return reply
         }
-        return reply
     }
 }

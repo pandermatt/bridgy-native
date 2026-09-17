@@ -5,15 +5,20 @@ import SwiftUI
 struct HowToPlayScreen: View {
     @Environment(AppModel.self) private var model
     @State private var demo = DemoBoard()
+    @State private var showingWelcome = false
 
     var body: some View {
         List {
             Section {
                 VStack(spacing: 12) {
-                    DemoBoardView(state: demo.state, settings: model.settings)
-                        .frame(maxWidth: 260)
-                        .frame(height: 260)
-                        .frame(maxWidth: .infinity)
+                    BoardCanvas(
+                        state: demo.state,
+                        theme: model.settings.theme,
+                        style: model.settings.boardStyle
+                    )
+                    .aspectRatio(1, contentMode: .fit)
+                    .frame(maxWidth: 260)
+                    .frame(maxWidth: .infinity)
                     Text(demo.caption)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -21,6 +26,14 @@ struct HowToPlayScreen: View {
                         .animation(.default, value: demo.caption)
                 }
                 .padding(.vertical, 8)
+            }
+
+            Section {
+                Button {
+                    showingWelcome = true
+                } label: {
+                    Label("What is Bridg-It?", systemImage: "sparkles")
+                }
             }
 
             Section {
@@ -44,6 +57,9 @@ struct HowToPlayScreen: View {
         }
         .navigationTitle("How to Play")
         .task { await demo.run() }
+        .sheet(isPresented: $showingWelcome) {
+            WelcomeScreen(onContinue: { showingWelcome = false })
+        }
     }
 
     private func rule(_ title: String, _ symbol: String, _ body: String) -> some View {
@@ -88,48 +104,5 @@ final class DemoBoard {
             }
             try? await Task.sleep(for: .milliseconds(650))
         }
-    }
-}
-
-/// Read-only board, for the demo.
-struct DemoBoardView: View {
-    let state: GameState
-    let settings: AppSettings
-
-    var body: some View {
-        GeometryReader { proxy in
-            let geometry = BoardGeometry(
-                board: state.board,
-                rect: CGRect(origin: .zero, size: proxy.size)
-            )
-            Canvas { context, _ in
-                let radius = geometry.dotRadius
-                for player in Player.allCases {
-                    var dots = Path()
-                    for dot in geometry.dots(for: player) {
-                        let centre = geometry.point(of: dot)
-                        dots.addEllipse(in: CGRect(
-                            x: centre.x - radius, y: centre.y - radius,
-                            width: radius * 2, height: radius * 2
-                        ))
-                    }
-                    context.fill(dots, with: .color(settings.colorway.color(for: player).opacity(0.45)))
-
-                    var edges = Path()
-                    for cell in 0..<state.board.cellCount where state.cells[cell] == player {
-                        let (from, to) = geometry.endpoints(of: state.board.move(at: cell), for: player)
-                        edges.move(to: from)
-                        edges.addLine(to: to)
-                    }
-                    context.stroke(
-                        edges,
-                        with: .color(settings.colorway.color(for: player)),
-                        style: StrokeStyle(lineWidth: geometry.lineWidth, lineCap: .round)
-                    )
-                }
-            }
-        }
-        .aspectRatio(1, contentMode: .fit)
-        .accessibilityHidden(true)
     }
 }

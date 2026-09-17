@@ -7,12 +7,12 @@ import SwiftUI
 @Observable
 final class AppSettings {
 
-    var colorway: Colorway { didSet { store(colorway.rawValue, "colorway") } }
+    var theme: BoardTheme { didSet { store(theme.rawValue, "boardTheme") } }
+    var boardStyle: BoardStyle { didSet { store(boardStyle.rawValue, "boardStyle") } }
     var soundEnabled: Bool { didSet { store(soundEnabled, "soundEnabled") } }
     var hapticsEnabled: Bool { didSet { store(hapticsEnabled, "hapticsEnabled") } }
-    var showDots: Bool { didSet { store(showDots, "showDots") } }
-    var boldLines: Bool { didSet { store(boldLines, "boldLines") } }
     var showHints: Bool { didSet { store(showHints, "showHints") } }
+    var hasSeenWelcome: Bool { didSet { store(hasSeenWelcome, "hasSeenWelcome") } }
 
     var watchPace: WatchPace {
         didSet {
@@ -25,12 +25,29 @@ final class AppSettings {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        colorway = Colorway(rawValue: defaults.string(forKey: "colorway") ?? "") ?? .classic
+
+        // `colorway` was the old two-option setting; carry a choice over rather
+        // than silently resetting it.
+        let storedTheme = defaults.string(forKey: "boardTheme")
+            ?? defaults.string(forKey: "colorway").map { $0 == "accessible" ? "contrast" : $0 }
+        theme = BoardTheme(rawValue: storedTheme ?? "") ?? .classic
+
+        // Likewise `showDots` and `boldLines`, which were really one choice.
+        if let storedStyle = defaults.string(forKey: "boardStyle"),
+           let style = BoardStyle(rawValue: storedStyle) {
+            boardStyle = style
+        } else if defaults.object(forKey: "showDots") as? Bool == false {
+            boardStyle = .lines
+        } else if defaults.object(forKey: "boldLines") as? Bool == true {
+            boardStyle = .bold
+        } else {
+            boardStyle = .classic
+        }
+
         soundEnabled = defaults.object(forKey: "soundEnabled") as? Bool ?? true
         hapticsEnabled = defaults.object(forKey: "hapticsEnabled") as? Bool ?? true
-        showDots = defaults.object(forKey: "showDots") as? Bool ?? true
-        boldLines = defaults.object(forKey: "boldLines") as? Bool ?? false
         showHints = defaults.object(forKey: "showHints") as? Bool ?? false
+        hasSeenWelcome = defaults.object(forKey: "hasSeenWelcome") as? Bool ?? false
         watchPace = WatchPace(
             movesPerSecond: defaults.object(forKey: "watchMovesPerSecond") as? Double
                 ?? WatchPace.default.movesPerSecond,

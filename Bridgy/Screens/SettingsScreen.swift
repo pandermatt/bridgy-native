@@ -8,33 +8,44 @@ struct SettingsScreen: View {
         @Bindable var settings = model.settings
         Form {
             Section {
-                Picker("Players", selection: $settings.colorway) {
-                    ForEach(Colorway.allCases) { colorway in
-                        Text(colorway.displayName).tag(colorway)
-                    }
-                }
-                .pickerStyle(.inline)
-                HStack(spacing: 16) {
-                    ForEach(Player.allCases, id: \.self) { player in
-                        Label {
-                            Text(player.displayName)
-                        } icon: {
-                            Circle()
-                                .fill(settings.colorway.color(for: player))
-                                .frame(width: 14, height: 14)
+                ForEach(BoardTheme.allCases) { theme in
+                    choiceRow(
+                        isSelected: settings.theme == theme,
+                        action: { settings.theme = theme }
+                    ) {
+                        HStack(spacing: 10) {
+                            dots(for: theme)
+                            Text(theme.displayName)
                         }
                     }
                 }
-                .font(.footnote)
             } header: {
-                Text("Colours")
+                Text("Theme")
             } footer: {
-                Text(settings.colorway.detail)
+                Text("Contrast, Ocean and Ember stay distinguishable with colour vision deficiency.")
+            }
+
+            Section {
+                ForEach(BoardStyle.allCases) { style in
+                    choiceRow(
+                        isSelected: settings.boardStyle == style,
+                        action: { settings.boardStyle = style }
+                    ) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(style.displayName)
+                            Text(style.detail)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Text("Board style")
+            } footer: {
+                Text("Also the style a finished game is shared in.")
             }
 
             Section("Board") {
-                Toggle("Show dots", isOn: $settings.showDots)
-                Toggle("Thick connections", isOn: $settings.boldLines)
                 Toggle("Show moves needed", isOn: $settings.showHints)
             }
 
@@ -43,10 +54,8 @@ struct SettingsScreen: View {
                 Toggle("Haptics", isOn: $settings.hapticsEnabled)
             }
 
-            Section {
+            Section("Watching two computers") {
                 WatchPaceControls(pace: $settings.watchPace)
-            } header: {
-                Text("Watching two computers")
             }
 
             Section {
@@ -62,5 +71,39 @@ struct SettingsScreen: View {
         .onChange(of: settings.soundEnabled) { _, enabled in
             if enabled { model.sound.prepare() }
         }
+    }
+
+    /// A list row that behaves like a picker option, so each choice can show what
+    /// it actually looks like rather than describing it.
+    private func choiceRow<Content: View>(
+        isSelected: Bool,
+        action: @escaping () -> Void,
+        @ViewBuilder label: () -> Content
+    ) -> some View {
+        Button(action: action) {
+            HStack {
+                label()
+                Spacer(minLength: 12)
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.tint)
+                }
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private func dots(for theme: BoardTheme) -> some View {
+        HStack(spacing: 5) {
+            ForEach(Player.allCases, id: \.self) { player in
+                Circle()
+                    .fill(theme.color(for: player))
+                    .frame(width: 18, height: 18)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }

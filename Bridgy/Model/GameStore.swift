@@ -7,7 +7,7 @@ import Foundation
 /// directory, derived by creating a throwaway temp file and slicing the path at
 /// the last `/`. This writes JSON to Application Support instead, which is where
 /// it belongs and which survives a reboot.
-struct GameStore {
+struct GameStore: Sendable {
 
     struct Snapshot: Codable, Sendable {
         var configuration: GameConfiguration
