@@ -11,15 +11,18 @@ struct HowToPlayScreen: View {
         List {
             Section {
                 VStack(spacing: 12) {
-                    // Always Classic: the rule beside this says "tap the gap
-                    // between two of your dots", and the dot-less styles would
-                    // leave nothing to point at. The theme still follows the
-                    // user's, so the colours match the rest of the app.
+                    // Always Classic, always rounded: the rule beside this says
+                    // "tap the gap between two of your dots", and a dot-less
+                    // style would leave nothing to point at. Square ends are the
+                    // same thing one step down — a stylistic choice turning hard
+                    // corners in what is meant to be a neutral explanation. The
+                    // theme still follows the user's, so the colours match the
+                    // rest of the app; only the shape is fixed.
                     BoardCanvas(
                         state: demo.state,
                         theme: model.settings.theme,
                         style: .classic,
-                        cap: model.settings.bridgeCap
+                        cap: .rounded
                     )
                     .aspectRatio(1, contentMode: .fit)
                     .frame(maxWidth: 260)
