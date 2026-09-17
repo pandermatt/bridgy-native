@@ -5,6 +5,7 @@ struct HomeScreen: View {
     @Environment(AppModel.self) private var model
     var onSelect: (Destination) -> Void
     var onResume: () -> Void
+    var onNewGame: () -> Void
 
     var body: some View {
         ScrollView {
@@ -23,12 +24,14 @@ struct HomeScreen: View {
                         }
                         ForEach(Destination.allCases) { destination in
                             GlassTile(
-                                title: destination == .play && !model.canResume ? "New Game" : destination.title,
+                                title: destination == .play ? "New Game" : destination.title,
                                 subtitle: destination.subtitle,
                                 symbolName: destination.symbolName,
                                 isProminent: destination == .play && !model.canResume
                             ) {
-                                onSelect(destination)
+                                // "New Game" has to mean a new game. Without this it
+                                // drops straight back into whatever is still running.
+                                if destination == .play { onNewGame() } else { onSelect(destination) }
                             }
                         }
                     }
@@ -41,6 +44,7 @@ struct HomeScreen: View {
         }
         .scrollEdgeEffectStyle(.soft, for: .all)
         .background { BackdropView(backdrop: model.settings.backdrop) }
+        .onAppear { model.refreshResumable() }
     }
 
     private var header: some View {

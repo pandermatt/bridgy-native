@@ -28,6 +28,10 @@ struct AppRoot: View {
                 onResume: {
                     model.resumeGame()
                     path.append(.play)
+                },
+                onNewGame: {
+                    model.session = nil
+                    path.append(.play)
                 }
             )
             .navigationDestination(for: Destination.self) { destination in
