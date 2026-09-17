@@ -24,6 +24,8 @@ struct BoardView: View {
                 theme: settings.theme,
                 style: settings.boardStyle,
                 cap: settings.bridgeCap,
+                guideDots: !session.configuration.isWatchOnly,
+                winningPath: settings.highlightsWinningPath ? session.winningPath : nil,
                 candidate: candidate(in: geometry),
                 hint: session.hintMove
             )

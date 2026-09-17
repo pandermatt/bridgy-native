@@ -30,6 +30,9 @@ final class GameSession {
     private(set) var readout = Readout()
     /// Set when the game ends or is stopped, so the screen can react once.
     private(set) var hasFinished = false
+    /// Cells of the chain that won. Computed once, when the game is decided —
+    /// the board redraws far too often to search for it per frame.
+    private(set) var winningPath: Set<Int>?
 
     /// A suggested move, shown until the player does something else.
     var hintMove: Move?
@@ -153,6 +156,7 @@ final class GameSession {
             state.undo()
         }
         hasFinished = false
+        winningPath = nil
         refreshReadout()
         scheduleSave()
         advance()
@@ -165,6 +169,7 @@ final class GameSession {
         hintMove = nil
         isPaused = false
         hasFinished = false
+        winningPath = nil
         recentMoves.removeAll()
         refreshReadout()
         scheduleSave()
@@ -236,12 +241,20 @@ final class GameSession {
         }
         if state.isOver {
             hasFinished = true
+            captureWinningPath()
             store.clear()
         } else {
             scheduleSave()
         }
         refreshReadout()
         advance()
+    }
+
+    /// Reuses the graph already built for this game rather than making another.
+    private func captureWinningPath() {
+        guard let winner = state.winner else { winningPath = nil; return }
+        let graph = winner == .blue ? blueGraph : redGraph
+        winningPath = Set(WinningPath.cells(in: state, for: winner, graph: graph))
     }
 
     private var pace: WatchPace? {

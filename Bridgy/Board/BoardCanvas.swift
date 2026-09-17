@@ -10,6 +10,14 @@ struct BoardCanvas: View {
     let theme: BoardTheme
     let style: BoardStyle
     var cap: BridgeCap = .rounded
+    /// Faint markers on the dots the style would not otherwise draw, so a human
+    /// has something to aim at. Off while two computers play.
+    var guideDots = false
+    /// Fades the loser's bridges once the game is decided.
+    var dimsLoser = true
+    /// Cells of the chain that won, passed in already computed so the canvas
+    /// never searches during a redraw.
+    var winningPath: Set<Int>?
     /// Ghosted cell under the pointer, on devices that have one.
     var candidate: Move?
     /// Suggested move, ringed rather than played.
@@ -39,6 +47,7 @@ struct BoardCanvas: View {
     private func draw(in context: inout GraphicsContext, geometry: BoardGeometry) {
         drawDots(in: &context, geometry: geometry)
         drawPlacedEdges(in: &context, geometry: geometry)
+        drawWinningPath(in: &context, geometry: geometry)
         drawCandidate(in: &context, geometry: geometry)
         drawHint(in: &context, geometry: geometry)
     }
@@ -46,25 +55,80 @@ struct BoardCanvas: View {
     // MARK: - Dots
 
     private func drawDots(in context: inout GraphicsContext, geometry: BoardGeometry) {
-        guard style.dots != .none else { return }
+        guard style.dots != .none || guideDots else { return }
         let radius = geometry.dotRadius
 
         for player in Player.allCases {
             let touched = style.dots == .connectedOnly ? connectedDots(for: player) : nil
             var path = Path()
+            var guides = Path()
             for dot in geometry.dots(for: player) {
+                var drawn = style.dots != .none
                 if let touched {
                     let stride = player == .blue ? state.board.size : state.board.size + 1
-                    guard touched.contains(dot.row * stride + dot.col) else { continue }
+                    drawn = touched.contains(dot.row * stride + dot.col)
                 }
                 let centre = geometry.point(of: dot)
-                path.addEllipse(in: CGRect(
-                    x: centre.x - radius, y: centre.y - radius,
-                    width: radius * 2, height: radius * 2
-                ))
+                if drawn {
+                    path.addEllipse(in: CGRect(
+                        x: centre.x - radius, y: centre.y - radius,
+                        width: radius * 2, height: radius * 2
+                    ))
+                } else if guideDots {
+                    // The dot this style would have hidden. A human still has to
+                    // aim at it, so it gets a smaller, fainter marker rather than
+                    // an empty board.
+                    let guide = max(1, radius * 0.55)
+                    guides.addEllipse(in: CGRect(
+                        x: centre.x - guide, y: centre.y - guide,
+                        width: guide * 2, height: guide * 2
+                    ))
+                }
             }
             let colour = theme.color(for: player)
             context.fill(path, with: .color(style.dots == .connectedOnly ? colour : colour.opacity(0.45)))
+            context.fill(guides, with: .color(colour.opacity(0.28)))
+        }
+    }
+
+    /// The chain that won, drawn over the main pass so it reads on every style.
+    private func drawWinningPath(in context: inout GraphicsContext, geometry: BoardGeometry) {
+        guard let winningPath, !winningPath.isEmpty, let winner = state.winner else { return }
+        let stroke = width(geometry)
+
+        var path = Path()
+        for cell in winningPath.sorted() {
+            let (from, to) = geometry.endpoints(of: state.board.move(at: cell), for: winner)
+            path.move(to: from)
+            path.addLine(to: to)
+        }
+
+        let colour = theme.color(for: winner)
+        // A soft spread first, then the chain at full strength. At Bolder there
+        // is no room beside a bridge, so the spread is kept under one lattice
+        // unit and the chain is marked from the inside instead.
+        if style.fillsItsCell {
+            context.stroke(
+                path,
+                with: .color(colour),
+                style: StrokeStyle(lineWidth: stroke, lineCap: cap.lineCap, lineJoin: cap.lineJoin)
+            )
+            context.stroke(
+                path,
+                with: .color(.white.opacity(0.5)),
+                style: StrokeStyle(lineWidth: stroke * 0.22, lineCap: cap.lineCap)
+            )
+        } else {
+            context.stroke(
+                path,
+                with: .color(colour.opacity(0.3)),
+                style: StrokeStyle(lineWidth: stroke * 2.4, lineCap: .round, lineJoin: .round)
+            )
+            context.stroke(
+                path,
+                with: .color(colour),
+                style: StrokeStyle(lineWidth: stroke * 1.15, lineCap: cap.lineCap, lineJoin: cap.lineJoin)
+            )
         }
     }
 
@@ -99,7 +163,7 @@ struct BoardCanvas: View {
             }
             let isWinner = state.winner == player
             let colour = theme.color(for: player)
-            let opacity = state.winner == nil || isWinner ? 1 : 0.35
+            let opacity = !dimsLoser || state.winner == nil || isWinner ? 1 : 0.35
 
             if style.glows {
                 context.stroke(
@@ -125,7 +189,7 @@ struct BoardCanvas: View {
         let colour = theme.color(for: owner)
         // Match the dimming the rest of this player's bridges get once the game
         // is decided; the halo used to ignore it and sit at full colour.
-        let opacity = state.winner == nil || state.winner == owner ? 1.0 : 0.35
+        let opacity = !dimsLoser || state.winner == nil || state.winner == owner ? 1.0 : 0.35
 
         if style.fillsItsCell {
             // Contained entirely within the bridge, so it cannot bleed into a

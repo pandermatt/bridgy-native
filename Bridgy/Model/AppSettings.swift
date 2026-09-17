@@ -14,6 +14,7 @@ final class AppSettings {
     var soundEnabled: Bool { didSet { store(soundEnabled, "soundEnabled") } }
     var hapticsEnabled: Bool { didSet { store(hapticsEnabled, "hapticsEnabled") } }
     var showHints: Bool { didSet { store(showHints, "showHints") } }
+    var highlightsWinningPath: Bool { didSet { store(highlightsWinningPath, "highlightsWinningPath") } }
     var hasSeenWelcome: Bool { didSet { store(hasSeenWelcome, "hasSeenWelcome") } }
 
     var watchPace: WatchPace {
@@ -51,6 +52,7 @@ final class AppSettings {
         soundEnabled = defaults.object(forKey: "soundEnabled") as? Bool ?? true
         hapticsEnabled = defaults.object(forKey: "hapticsEnabled") as? Bool ?? true
         showHints = defaults.object(forKey: "showHints") as? Bool ?? false
+        highlightsWinningPath = defaults.object(forKey: "highlightsWinningPath") as? Bool ?? true
         hasSeenWelcome = defaults.object(forKey: "hasSeenWelcome") as? Bool ?? false
         watchPace = WatchPace(
             movesPerSecond: defaults.object(forKey: "watchMovesPerSecond") as? Double

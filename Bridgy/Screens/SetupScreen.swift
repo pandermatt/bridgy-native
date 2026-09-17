@@ -76,17 +76,22 @@ struct SetupScreen: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 15)
+                    // Runs between the two players' colours: the game is about
+                    // two sides meeting, and the button may as well say so.
+                    //
+                    // Not `.glassProminent` with a gradient tint — `Glass.tint`
+                    // only takes a flat colour, so the gradient is resolved away
+                    // to one. Painting the gradient and putting clear glass over
+                    // it keeps the material's press behaviour and the colour both.
+                    .background(startGradient, in: .capsule)
+                    .glassEffect(.clear.interactive(), in: .capsule)
+                    // All of this has to live inside the label. `.plain` hit-tests
+                    // the label's drawn content, and a Label is glyphs with
+                    // transparent space around them — decorating the Button from
+                    // outside left most of the capsule dead to clicks.
+                    .contentShape(.capsule)
                 }
-                // Runs between the two players' colours: the game is about two
-                // sides meeting, and the button may as well say so.
-                //
-                // Not `.glassProminent` with a gradient tint — `Glass.tint` only
-                // takes a flat colour, so the gradient is resolved away to one.
-                // Painting the gradient and putting clear glass over it keeps the
-                // material's press behaviour and the colour both.
                 .buttonStyle(.plain)
-                .background(startGradient, in: .capsule)
-                .glassEffect(.clear.interactive(), in: .capsule)
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
             }
@@ -135,11 +140,23 @@ struct SetupScreen: View {
     private func seatSection(for player: Player) -> some View {
         let colour = model.settings.theme.color(for: player)
         return Section {
-            Picker(selection: binding(for: player)) {
-                Label("You", systemImage: "person").tag(Seat.human)
-                ForEach(Difficulty.allCases) { level in
-                    Label(level.displayName, systemImage: level.symbolName)
-                        .tag(Seat.computer(level))
+            // A Menu rather than a Picker, only so the *selected* value can be
+            // laid out here. A menu Picker renders its selection itself from the
+            // plain title: a Label, an HStack(spacing:) and even a symbol
+            // interpolated into the Text all get collapsed or dropped, which is
+            // why the icon sat welded to the word.
+            LabeledContent {
+                Menu {
+                    Picker("Played by", selection: binding(for: player)) {
+                        Text("You").tag(Seat.human)
+                        ForEach(Difficulty.allCases) { level in
+                            Text(level.displayName).tag(Seat.computer(level))
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                } label: {
+                    seatValue(binding(for: player).wrappedValue)
                 }
             } label: {
                 Label {
@@ -148,7 +165,6 @@ struct SetupScreen: View {
                     Image(systemName: player.symbolName).foregroundStyle(colour)
                 }
             }
-            .pickerStyle(.menu)
 
             if let level = binding(for: player).wrappedValue.difficulty {
                 Text(level.summary)
@@ -169,6 +185,18 @@ struct SetupScreen: View {
                 Spacer()
                 Text(player.goalDescription).textCase(nil)
             }
+        }
+    }
+
+    /// The chosen seat, as the row shows it: symbol, a real gap, the name, and
+    /// the up/down chevron a picker would have drawn.
+    private func seatValue(_ seat: Seat) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: seat.symbolName)
+            Text(seat.displayName)
+            Image(systemName: "chevron.up.chevron.down")
+                .imageScale(.small)
+                .foregroundStyle(.secondary)
         }
     }
 

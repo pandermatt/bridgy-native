@@ -45,6 +45,9 @@ colours; three of them stay distinguishable with colour vision deficiency.
   SwiftPM package with no UI dependencies
 - `Bridgy/` — the SwiftUI app
 - `Tools/MakeIcon.swift` — draws the app icon; no artwork is checked in by hand
+- `Tools/RenderForms.swift` — snapshots macOS grouped-`Form` layouts to PNG with no
+  screen, for checking chrome that only misbehaves on the Mac
+  (`swiftc Tools/RenderForms.swift -o /tmp/renderforms && /tmp/renderforms /tmp/out`)
 
 ## Building
 

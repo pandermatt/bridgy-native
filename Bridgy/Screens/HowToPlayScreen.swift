@@ -11,10 +11,14 @@ struct HowToPlayScreen: View {
         List {
             Section {
                 VStack(spacing: 12) {
+                    // Always Classic: the rule beside this says "tap the gap
+                    // between two of your dots", and the dot-less styles would
+                    // leave nothing to point at. The theme still follows the
+                    // user's, so the colours match the rest of the app.
                     BoardCanvas(
                         state: demo.state,
                         theme: model.settings.theme,
-                        style: model.settings.boardStyle,
+                        style: .classic,
                         cap: model.settings.bridgeCap
                     )
                     .aspectRatio(1, contentMode: .fit)

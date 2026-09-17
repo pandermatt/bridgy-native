@@ -9,18 +9,24 @@ import SwiftUI
 struct ResultSheet: View {
     let state: GameState
     let configuration: GameConfiguration
-    let theme: BoardTheme
-    let cap: BridgeCap
     var onPlayAgain: () -> Void
     var onChangeSetup: () -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var shareURL: URL?
 
-    /// Local to this sheet on purpose: picking a style here is about the picture
-    /// being shared, not about how the next game will be drawn. The board style
-    /// proper is changed from the game's own toolbar or from Settings.
+    /// Every one of these is local to this sheet on purpose. Dressing a finished
+    /// game up for sharing is about the picture, not about how the next game will
+    /// be drawn — those live in the game's own toolbar and in Settings. They are
+    /// seeded from the stored settings and never written back.
     @State private var style: BoardStyle
+    @State private var theme: BoardTheme
+    @State private var cap: BridgeCap
+    @State private var dimsLoser = true
+    @State private var highlightsPath: Bool
+
+    /// Computed once for the whole sheet: the board redraws on every control.
+    @State private var path: Set<Int> = []
 
     init(
         state: GameState,
@@ -28,24 +34,28 @@ struct ResultSheet: View {
         theme: BoardTheme,
         cap: BridgeCap,
         initialStyle: BoardStyle,
+        highlightsWinningPath: Bool,
         onPlayAgain: @escaping () -> Void,
         onChangeSetup: @escaping () -> Void
     ) {
         self.state = state
         self.configuration = configuration
-        self.theme = theme
-        self.cap = cap
         self.onPlayAgain = onPlayAgain
         self.onChangeSetup = onChangeSetup
         _style = State(initialValue: initialStyle)
+        _theme = State(initialValue: theme)
+        _cap = State(initialValue: cap)
+        _highlightsPath = State(initialValue: highlightsWinningPath)
     }
+
+    private var shownPath: Set<Int>? { highlightsPath ? path : nil }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
                     board
-                    stylePicker
+                    pictureControls
                     actions
                 }
                 .padding()
@@ -63,11 +73,33 @@ struct ResultSheet: View {
                 }
             }
         }
-        .task(id: style) { shareURL = renderShareImage() }
+        .task { path = Set(WinningPath.forWinner(of: state)) }
+        .task(id: picture) { shareURL = renderShareImage() }
+    }
+
+    /// Everything the rendered picture depends on, so one `.task` covers them all.
+    private var picture: PictureSettings {
+        PictureSettings(style: style, theme: theme, cap: cap, dimsLoser: dimsLoser, path: shownPath)
+    }
+
+    struct PictureSettings: Equatable {
+        var style: BoardStyle
+        var theme: BoardTheme
+        var cap: BridgeCap
+        var dimsLoser: Bool
+        var path: Set<Int>?
     }
 
     private var board: some View {
-        BoardCanvas(state: state, theme: theme, style: style, cap: cap, highlightsLastMove: false)
+        BoardCanvas(
+            state: state,
+            theme: theme,
+            style: style,
+            cap: cap,
+            dimsLoser: dimsLoser,
+            winningPath: shownPath,
+            highlightsLastMove: false
+        )
             .aspectRatio(1, contentMode: .fit)
             .padding(12)
             .background {
@@ -76,18 +108,46 @@ struct ResultSheet: View {
             }
     }
 
-    private var stylePicker: some View {
-        VStack(spacing: 6) {
-            Picker("Picture style", selection: $style) {
-                ForEach(BoardStyle.allCases) { option in
-                    Text(option.displayName).tag(option)
+    private var pictureControls: some View {
+        VStack(spacing: 10) {
+            LabeledContent("Style") {
+                Picker("Style", selection: $style) {
+                    ForEach(BoardStyle.allCases) { option in
+                        Text(option.displayName).tag(option)
+                    }
                 }
+                .labelsHidden()
+                .pickerStyle(.menu)
             }
-            .pickerStyle(.menu)
+            LabeledContent("Colours") {
+                Picker("Colours", selection: $theme) {
+                    ForEach(BoardTheme.allCases) { option in
+                        Text(option.displayName).tag(option)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+            }
+            LabeledContent("Ends") {
+                Picker("Ends", selection: $cap) {
+                    ForEach(BridgeCap.allCases) { option in
+                        Text(option.displayName).tag(option)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 200)
+            }
+            Toggle("Dim the loser", isOn: $dimsLoser)
+            Toggle("Highlight the winning path", isOn: $highlightsPath)
+                .disabled(path.isEmpty)
+
             Text(style.detail)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.horizontal, 4)
     }
 
     private var actions: some View {
@@ -142,6 +202,8 @@ struct ResultSheet: View {
                 theme: theme,
                 style: style,
                 cap: cap,
+                dimsLoser: dimsLoser,
+                winningPath: shownPath,
                 caption: "\(title) · \(subtitle)"
             )
         )
@@ -162,12 +224,22 @@ struct ShareableBoard: View {
     let theme: BoardTheme
     let style: BoardStyle
     let cap: BridgeCap
+    let dimsLoser: Bool
+    let winningPath: Set<Int>?
     let caption: String
 
     var body: some View {
         VStack(spacing: 18) {
-            BoardCanvas(state: state, theme: theme, style: style, cap: cap, highlightsLastMove: false)
-                .frame(width: 440, height: 440)
+            BoardCanvas(
+                state: state,
+                theme: theme,
+                style: style,
+                cap: cap,
+                dimsLoser: dimsLoser,
+                winningPath: winningPath,
+                highlightsLastMove: false
+            )
+            .frame(width: 440, height: 440)
             Text(caption)
                 .font(.system(size: 17, weight: .medium, design: .rounded))
                 .foregroundStyle(style.prefersDarkGround ? .white : .primary)

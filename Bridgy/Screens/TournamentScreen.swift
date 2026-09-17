@@ -10,7 +10,7 @@ struct TournamentScreen: View {
     @State private var selectedGames: Int?
 
     var body: some View {
-        List {
+        Form {
             setupSection
             if let analysis = run.analysis, analysis.gamesPlayed > 0 {
                 ratingsSection(analysis)
@@ -20,6 +20,11 @@ struct TournamentScreen: View {
                 exportSection
             }
         }
+        // Was a bare List, which on macOS gave no grouped card at all: steppers
+        // stretched edge to edge with their arrows pinned right, and the run
+        // button fell back to a small default push button. This matches Settings
+        // and Setup, which both already use it.
+        .formStyle(.grouped)
         .navigationTitle("Tournament")
         .onDisappear { run.stop() }
     }
@@ -28,15 +33,27 @@ struct TournamentScreen: View {
 
     private var setupSection: some View {
         Section {
-            Stepper(value: $run.configuration.minimumSize, in: Board.minimumSize...12) {
-                LabeledContent("Smallest board", value: "\(run.configuration.minimumSize)")
+            // Plain Text labels, not LabeledContent: that expands to fill, which
+            // is what pushed the stepper arrows to the far edge on macOS.
+            Group {
+                Stepper(
+                    "Smallest board: \(run.configuration.minimumSize)",
+                    value: $run.configuration.minimumSize,
+                    in: Board.minimumSize...12
+                )
+                Stepper(
+                    "Largest board: \(run.configuration.maximumSize)",
+                    value: $run.configuration.maximumSize,
+                    in: Board.minimumSize...12
+                )
+                Stepper(
+                    "Games per colour: \(run.configuration.gamesPerColour)",
+                    value: $run.configuration.gamesPerColour,
+                    in: 1...50
+                )
             }
-            Stepper(value: $run.configuration.maximumSize, in: Board.minimumSize...12) {
-                LabeledContent("Largest board", value: "\(run.configuration.maximumSize)")
-            }
-            Stepper(value: $run.configuration.gamesPerColour, in: 1...50) {
-                LabeledContent("Games per colour", value: "\(run.configuration.gamesPerColour)")
-            }
+            // Was on the last stepper alone, so the two board-size steppers
+            // stayed live while a tournament was running.
             .disabled(run.isRunning)
 
             if run.isRunning {
@@ -47,9 +64,20 @@ struct TournamentScreen: View {
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
-                Button("Stop", role: .destructive) { run.stop() }
+                // The label expands, not the Button: on macOS a frame on the
+                // button widens its hit area but leaves the drawn control at its
+                // intrinsic width.
+                Button(role: .destructive) { run.stop() } label: {
+                    Text("Stop").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
             } else {
-                Button("Run \(run.totalGames) Games") { run.start() }
+                Button { run.start() } label: {
+                    Text("Run \(run.totalGames) Games").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             }
         } header: {
             Text("Setup")

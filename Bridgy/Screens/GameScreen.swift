@@ -31,6 +31,7 @@ struct GameScreen: View {
                     theme: model.settings.theme,
                     cap: model.settings.bridgeCap,
                     initialStyle: model.settings.boardStyle,
+                    highlightsWinningPath: model.settings.highlightsWinningPath,
                     onPlayAgain: { session.restart() },
                     onChangeSetup: { model.session = nil }
                 )
