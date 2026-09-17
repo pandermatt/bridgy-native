@@ -225,8 +225,8 @@ public struct TournamentAnalysis: Sendable {
         }
         lines.append("")
 
-        lines.append("First-player advantage (blue wins, all pairings)")
-        lines.append("Board size;Blue wins;Games;Rate;CI low;CI high")
+        lines.append("First-player advantage (first player wins, all pairings)")
+        lines.append("Board size;First-player wins;Games;Rate;CI low;CI high")
         for size in configuration.sizes {
             let r = firstPlayerRecord(atSize: size)
             lines.append(

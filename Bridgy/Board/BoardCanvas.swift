@@ -28,8 +28,11 @@ struct BoardCanvas: View {
         }
     }
 
+    /// Straight off the lattice, so "Bolder touches its neighbours" stays true
+    /// at every board size. The old path multiplied `lineWidth`, which carried a
+    /// 2pt floor and stopped tracking the lattice on large boards.
     private func width(_ geometry: BoardGeometry) -> CGFloat {
-        geometry.lineWidth * style.strokeScale
+        max(1, geometry.scale * style.strokeLatticeWidth)
     }
 
     private func draw(in context: inout GraphicsContext, geometry: BoardGeometry) {
@@ -80,12 +83,15 @@ struct BoardCanvas: View {
     private func drawPlacedEdges(in context: inout GraphicsContext, geometry: BoardGeometry) {
         let stroke = width(geometry)
         let lastMove = highlightsLastMove ? state.moves.last : nil
+        // A halo needs room beside the bridge. Bolder has none, so there the last
+        // move stays in the main pass and is marked from the inside instead.
+        let haloed = style.fillsItsCell ? nil : lastMove
 
         for player in Player.allCases {
             var path = Path()
             for cell in 0..<state.board.cellCount where state.cells[cell] == player {
                 let move = state.board.move(at: cell)
-                if move == lastMove { continue }
+                if move == haloed { continue }
                 let (from, to) = geometry.endpoints(of: move, for: player)
                 path.move(to: from)
                 path.addLine(to: to)
@@ -108,22 +114,35 @@ struct BoardCanvas: View {
             )
         }
 
-        // The move just played gets a halo, so it is obvious what changed — the
+        // The move just played is marked, so it is obvious what changed — the
         // original drew it dashed for the same reason.
-        if let lastMove, let owner = state.owner(of: lastMove) {
-            let (from, to) = geometry.endpoints(of: lastMove, for: owner)
-            var path = Path()
-            path.move(to: from)
-            path.addLine(to: to)
-            let colour = theme.color(for: owner)
+        guard let lastMove, let owner = state.owner(of: lastMove) else { return }
+        let (from, to) = geometry.endpoints(of: lastMove, for: owner)
+        var path = Path()
+        path.move(to: from)
+        path.addLine(to: to)
+        let colour = theme.color(for: owner)
+        // Match the dimming the rest of this player's bridges get once the game
+        // is decided; the halo used to ignore it and sit at full colour.
+        let opacity = state.winner == nil || state.winner == owner ? 1.0 : 0.35
+
+        if style.fillsItsCell {
+            // Contained entirely within the bridge, so it cannot bleed into a
+            // neighbour that is touching it.
             context.stroke(
                 path,
-                with: .color(colour.opacity(0.35)),
+                with: .color(.white.opacity(0.45 * opacity)),
+                style: StrokeStyle(lineWidth: stroke * 0.28, lineCap: .round)
+            )
+        } else {
+            context.stroke(
+                path,
+                with: .color(colour.opacity(0.35 * opacity)),
                 style: StrokeStyle(lineWidth: stroke * 2.1, lineCap: .round)
             )
             context.stroke(
                 path,
-                with: .color(colour),
+                with: .color(colour.opacity(opacity)),
                 style: StrokeStyle(lineWidth: stroke, lineCap: .round)
             )
         }

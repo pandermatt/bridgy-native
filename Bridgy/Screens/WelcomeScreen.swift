@@ -34,8 +34,8 @@ struct WelcomeScreen: View {
                             "Cross the board",
                             "arrow.up.and.down",
                             """
-                            Blue moves first and needs a chain from top to bottom. Red needs one \
-                            from left to right.
+                            Down moves first and needs a chain from top to bottom. Across needs \
+                            one from left to right.
                             """
                         )
                         row(

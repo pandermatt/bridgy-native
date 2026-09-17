@@ -38,16 +38,16 @@ struct HowToPlayScreen: View {
 
             Section {
                 rule("Two grids, interleaved", "square.grid.3x3", """
-                Blue owns one grid of dots, red the other. They overlap so that every bridge blue \
-                could build crosses exactly one bridge red could build.
+                You own one grid of dots, your opponent the other. They overlap so that every \
+                bridge you could build crosses exactly one of theirs.
                 """)
                 rule("Join your own dots", "hand.tap", """
                 Tap the gap between two of your dots to bridge them. Taking a gap also denies it to \
                 your opponent, so every move builds and blocks at once.
                 """)
                 rule("Cross the board", "arrow.up.and.down", """
-                Blue moves first and needs an unbroken chain from top to bottom. Red needs one from \
-                left to right.
+                Down moves first and needs an unbroken chain from top to bottom. Across needs one \
+                from left to right.
                 """)
                 rule("Somebody always wins", "checkmark", """
                 There are no draws. When the board fills, exactly one player has crossed it — and it \
@@ -83,8 +83,10 @@ struct HowToPlayScreen: View {
 @MainActor
 @Observable
 final class DemoBoard {
+    static let opening = "Down is trying to get from the top edge to the bottom."
+
     private(set) var state = GameState(size: 4)
-    private(set) var caption = "Blue is trying to get from the top edge to the bottom."
+    private(set) var caption = DemoBoard.opening
 
     func run() async {
         let blue = ShortestPathEngine(strategy: .balanced, tieBreak: .longestConnection)
@@ -95,7 +97,7 @@ final class DemoBoard {
                 caption = "\(state.winner!.displayName) got across. Starting again…"
                 try? await Task.sleep(for: .seconds(2.2))
                 state = GameState(size: 4)
-                caption = "Blue is trying to get from the top edge to the bottom."
+                caption = DemoBoard.opening
                 continue
             }
             let engine: any Engine = state.current == .blue ? blue : red

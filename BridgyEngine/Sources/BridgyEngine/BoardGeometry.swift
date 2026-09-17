@@ -47,7 +47,6 @@ public struct BoardGeometry {
 
     public var dotRadius: CGFloat { max(1.5, scale * 0.22) }
     public var lineWidth: CGFloat { max(2, scale * 0.34) }
-    public var boldLineWidth: CGFloat { max(3, scale * 0.52) }
 
     public func point(latticeX x: CGFloat, y: CGFloat) -> CGPoint {
         CGPoint(x: origin.x + x * scale, y: origin.y + y * scale)

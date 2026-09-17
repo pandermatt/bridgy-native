@@ -4,6 +4,7 @@ import SwiftUI
 
 /// Every engine against every other, plotted while it runs.
 struct TournamentScreen: View {
+    @Environment(AppModel.self) private var model
     @State private var run = TournamentRun()
     @State private var focus: String?
     @State private var selectedGames: Int?
@@ -190,9 +191,9 @@ struct TournamentScreen: View {
                 ForEach(analysis.firstPlayerPoints) { point in
                     BarMark(
                         x: .value("Board size", "\(point.size)"),
-                        y: .value("Blue win rate", point.record.rate)
+                        y: .value("First-player win rate", point.record.rate)
                     )
-                    .foregroundStyle(.blue.opacity(0.7))
+                    .foregroundStyle(model.settings.theme.color(for: .blue).opacity(0.75))
 
                     RuleMark(
                         x: .value("Board size", "\(point.size)"),
@@ -215,7 +216,7 @@ struct TournamentScreen: View {
         } header: {
             Text("First-player advantage")
         } footer: {
-            Text("Blue moves first, and Bridg-It is provably a first-player win, so these bars should sit above the dashed line. If they do not, the field is too weak to exploit it — or something is wrong.")
+            Text("Down moves first, and Bridg-It is provably a first-player win, so these bars should sit above the dashed line. If they do not, the field is too weak to exploit it — or something is wrong.")
         }
     }
 

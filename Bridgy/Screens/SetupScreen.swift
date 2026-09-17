@@ -73,13 +73,20 @@ struct SetupScreen: View {
                         systemImage: "play.fill"
                     )
                     .font(.headline)
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
+                    .padding(.vertical, 15)
                 }
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-                // Tinted to whoever moves first, so the button belongs to the game
-                // rather than sitting on top of it.
-                .tint(model.settings.theme.color(for: .blue))
+                // Runs between the two players' colours: the game is about two
+                // sides meeting, and the button may as well say so.
+                //
+                // Not `.glassProminent` with a gradient tint — `Glass.tint` only
+                // takes a flat colour, so the gradient is resolved away to one.
+                // Painting the gradient and putting clear glass over it keeps the
+                // material's press behaviour and the colour both.
+                .buttonStyle(.plain)
+                .background(startGradient, in: .capsule)
+                .glassEffect(.clear.interactive(), in: .capsule)
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
             }
@@ -97,6 +104,17 @@ struct SetupScreen: View {
         .onChange(of: configuration.blue) { _, _ in clampSize() }
         .onChange(of: configuration.red) { _, _ in clampSize() }
         .onChange(of: availableBoardSide) { _, _ in clampSize() }
+    }
+
+    private var startGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                model.settings.theme.color(for: .blue),
+                model.settings.theme.color(for: .red)
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
     }
 
     private var sizeNote: String? {

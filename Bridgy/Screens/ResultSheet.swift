@@ -60,7 +60,7 @@ struct ResultSheet: View {
                     Text(option.displayName).tag(option)
                 }
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.menu)
             Text(style.detail)
                 .font(.footnote)
                 .foregroundStyle(.secondary)

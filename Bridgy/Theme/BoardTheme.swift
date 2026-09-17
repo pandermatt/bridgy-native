@@ -53,73 +53,21 @@ enum BoardTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     }
 }
 
-/// How the board is drawn — on screen and in a shared image.
-///
-/// This replaces a pair of booleans (`showDots`, `boldLines`) that were really
-/// one choice. Joined is the interesting one: the untouched lattice disappears
-/// and what is left is the shape of the game.
-enum BoardStyle: String, CaseIterable, Identifiable, Codable, Sendable {
-    case classic
-    case connected
-    case lines
-    case bold
-    case neon
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .classic: return "Classic"
-        case .connected: return "Joined"
-        case .lines: return "Lines"
-        case .bold: return "Bold"
-        case .neon: return "Neon"
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .classic: return "Every dot, as the board really is."
-        case .connected: return "Only the dots a bridge has joined."
-        case .lines: return "No dots — just the bridges."
-        case .bold: return "Thick strokes, no dots. Good for sharing."
-        case .neon: return "Glowing strokes on a dark ground."
-        }
-    }
-
-    enum Dots { case all, connectedOnly, none }
-
-    var dots: Dots {
-        switch self {
-        case .classic: return .all
-        case .connected: return .connectedOnly
-        case .lines, .bold, .neon: return .none
-        }
-    }
-
-    /// Multiplier on the base stroke width.
-    var strokeScale: CGFloat {
-        switch self {
-        case .classic, .connected, .lines: return 1
-        case .bold: return 1.7
-        case .neon: return 1.15
-        }
-    }
-
-    var glows: Bool { self == .neon }
-
-    /// Shared images look better on their own ground than on the system's.
-    var prefersDarkGround: Bool { self == .neon }
-}
-
 extension Player {
-    /// What this player is trying to do, in words.
+    /// Named for what the player is trying to do rather than for a colour.
+    ///
+    /// A theme can make the second player orange or pink, at which point "Red"
+    /// is simply false — but Across is always across, and the direction is the
+    /// thing worth remembering anyway. The colour still travels with the label
+    /// as a dot.
+    var displayName: String {
+        self == .blue ? "Down" : "Across"
+    }
+
+    /// The same idea spelled out, for places that are teaching rather than
+    /// labelling.
     var goalDescription: String {
         self == .blue ? "top to bottom" : "left to right"
-    }
-
-    var displayName: String {
-        self == .blue ? "Blue" : "Red"
     }
 
     var symbolName: String {

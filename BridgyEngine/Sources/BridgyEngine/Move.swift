@@ -2,6 +2,12 @@
 ///
 /// Blue is player 1 in the original: it moves first and needs a top-to-bottom
 /// chain. Red needs left-to-right.
+///
+/// The case names are historical and geometric — they are what the original
+/// called the two sides, and they pin down which dot lattice each player owns.
+/// They are deliberately *not* what the app shows: a theme can make the second
+/// player orange, so the UI names them by direction instead, Down and Across.
+/// See `Player.displayName`.
 public enum Player: Int, Sendable, Hashable, Codable, CaseIterable {
     case blue = 0
     case red = 1

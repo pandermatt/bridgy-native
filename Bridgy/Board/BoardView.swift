@@ -63,8 +63,8 @@ struct BoardView: View {
     private var accessibilityValue: String {
         var parts = [session.statusText]
         let readout = session.readout
-        if let blue = readout.blue { parts.append("Blue needs \(blue) more") }
-        if let red = readout.red { parts.append("Red needs \(red) more") }
+        if let down = readout.blue { parts.append("\(Player.blue.displayName) needs \(down) more") }
+        if let across = readout.red { parts.append("\(Player.red.displayName) needs \(across) more") }
         return parts.joined(separator: ". ")
     }
 }
