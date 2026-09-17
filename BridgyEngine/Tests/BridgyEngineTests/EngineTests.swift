@@ -169,3 +169,68 @@ struct EngineTests {
         #expect(blueWins < 0.45, "greedy-as-blue won \(blueWins * 100)% against pathfinder-as-red")
     }
 }
+
+@Suite("Difficulty ladder")
+struct DifficultyLadderTests {
+
+    /// Compares two levels without the first-player advantage confusing things:
+    /// each plays blue against the other, and the stronger one should do better
+    /// from that seat than its opponent does.
+    private func strongerWinsAsBlue(_ stronger: Difficulty, than weaker: Difficulty, size: Int = 6) -> Bool {
+        let games = 10
+        let strongerAsBlue = Match.winRate(
+            size: size,
+            blue: stronger.tournamentEngine(forSize: size),
+            red: weaker.tournamentEngine(forSize: size),
+            games: games,
+            seed: 0x1AD5
+        )
+        let weakerAsBlue = Match.winRate(
+            size: size,
+            blue: weaker.tournamentEngine(forSize: size),
+            red: stronger.tournamentEngine(forSize: size),
+            games: games,
+            seed: 0x1AD5 &+ 1
+        )
+        return strongerAsBlue > weakerAsBlue
+    }
+
+    @Test("The lower rungs are strictly ordered")
+    func lowerRungsAreOrdered() {
+        #expect(strongerWinsAsBlue(.casual, than: .easy))
+        #expect(strongerWinsAsBlue(.medium, than: .casual))
+        #expect(strongerWinsAsBlue(.hard, than: .medium))
+    }
+
+    /// Hard is already exact — it counts both players' remaining moves — so the
+    /// gaps above it are real but narrow, and asserting a precise ordering there
+    /// would only produce a flaky test. What matters to a player is that the top
+    /// levels are decisively better than the middle of the ladder.
+    @Test("The top levels are decisively stronger than the middle")
+    func upperRungsBeatTheMiddle() {
+        for level in [Difficulty.expert, .perfect] {
+            let rate = Match.winRate(
+                size: 6,
+                blue: level.tournamentEngine(forSize: 6),
+                red: Difficulty.medium.tournamentEngine(forSize: 6),
+                games: 10,
+                seed: 24_601
+            )
+            #expect(rate >= 0.9, "\(level.displayName) won only \(rate * 100)% against Medium")
+        }
+    }
+
+    @Test("Perfect never loses from the seat where it has a strategy")
+    func perfectIsPerfectAsBlue() {
+        for opponent in [Difficulty.hard, .expert] {
+            let rate = Match.winRate(
+                size: 5,
+                blue: Difficulty.perfect.tournamentEngine(forSize: 5),
+                red: opponent.tournamentEngine(forSize: 5),
+                games: 10,
+                seed: 1_964
+            )
+            #expect(rate == 1.0, "Perfect lost a game as blue to \(opponent.displayName)")
+        }
+    }
+}

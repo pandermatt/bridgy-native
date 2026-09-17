@@ -31,6 +31,7 @@ struct BridgyApp: App {
         }
         #if os(macOS)
         .defaultSize(width: 980, height: 760)
+        .windowResizability(.contentMinSize)
         #endif
     }
 }

@@ -12,7 +12,10 @@ struct AppRoot: View {
 
     var body: some View {
         #if os(macOS)
+        // Every view here is flexible, so SwiftUI has no ideal size to size the
+        // window from. Give it a floor rather than let it open arbitrarily small.
         splitLayout
+            .frame(minWidth: 760, minHeight: 580)
         #else
         if sizeClass == .regular { splitLayout } else { stackLayout }
         #endif
@@ -40,6 +43,8 @@ struct AppRoot: View {
                 Label(destination.title, systemImage: destination.symbolName)
                     .tag(destination)
             }
+            .scrollContentBackground(.hidden)
+            .background { BackdropView(backdrop: model.settings.backdrop) }
             .navigationTitle("Bridgy")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.large)

@@ -43,3 +43,4 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.board-games
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_HARDENED_RUNTIME: YES
+

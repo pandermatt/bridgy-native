@@ -40,7 +40,7 @@ final class GameSession {
         self.sound = sound
         self.store = store
         self.state = state ?? GameState(size: configuration.size)
-        self.isPaused = configuration.isWatchOnly
+        self.isPaused = false
     }
 
     // MARK: - Status
@@ -75,10 +75,14 @@ final class GameSession {
         if let winner = state.winner {
             return "\(winner.displayName) wins"
         }
+        if configuration.isWatchOnly {
+            guard !isPaused else { return "Paused" }
+            return "\(state.current.displayName) · \(currentSeat.displayName)"
+        }
         if isThinking { return "\(currentSeat.displayName) is thinking…" }
         if configuration.isLocalTwoPlayer { return "\(state.current.displayName) to play" }
         if isHumanTurn { return "Your turn — \(state.current.goalDescription)" }
-        return "\(currentSeat.displayName) to play"
+        return "\(currentSeat.displayName) is playing \(state.current.displayName)"
     }
 
     // MARK: - Playing
@@ -117,9 +121,9 @@ final class GameSession {
         dragOrigin = nil
         dragPoint = nil
         hintMove = nil
-        isPaused = configuration.isWatchOnly
+        isPaused = false
         persist()
-        if !isPaused { advance() }
+        advance()
     }
 
     /// Pause and resume, for two computers playing each other.

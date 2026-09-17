@@ -1,4 +1,3 @@
-import BridgyEngine
 import CoreGraphics
 
 /// Maps between the board's integer lattice and points on screen.
@@ -6,28 +5,39 @@ import CoreGraphics
 /// Blue's dots sit at `(2c+1, 2r)` and red's at `(2c, 2r+1)`, so the two grids
 /// interleave and every cell centre falls exactly between the four dots around
 /// it. Everything on screen derives from that one lattice.
-struct BoardGeometry {
+public struct BoardGeometry {
 
     /// A dot belonging to one player.
-    struct Dot: Hashable, Sendable {
-        let player: Player
-        let row: Int
-        let col: Int
+    public struct Dot: Hashable, Sendable {
+        public let player: Player
+        public let row: Int
+        public let col: Int
+
+        public init(player: Player, row: Int, col: Int) {
+            self.player = player
+            self.row = row
+            self.col = col
+        }
     }
 
-    let board: Board
-    let rect: CGRect
+    public let board: Board
+    public let rect: CGRect
+
+    public init(board: Board, rect: CGRect) {
+        self.board = board
+        self.rect = rect
+    }
 
     /// Breathing room around the outermost dots, in lattice units.
     private static let padding: CGFloat = 0.8
 
-    var scale: CGFloat {
+    public var scale: CGFloat {
         let units = CGFloat(board.span) + 2 * Self.padding
         return min(rect.width, rect.height) / units
     }
 
     /// Where lattice `(0, 0)` lands, with the board centred in `rect`.
-    var origin: CGPoint {
+    public var origin: CGPoint {
         let side = CGFloat(board.span) * scale
         return CGPoint(
             x: rect.midX - side / 2,
@@ -35,28 +45,28 @@ struct BoardGeometry {
         )
     }
 
-    var dotRadius: CGFloat { max(1.5, scale * 0.22) }
-    var lineWidth: CGFloat { max(2, scale * 0.34) }
-    var boldLineWidth: CGFloat { max(3, scale * 0.52) }
+    public var dotRadius: CGFloat { max(1.5, scale * 0.22) }
+    public var lineWidth: CGFloat { max(2, scale * 0.34) }
+    public var boldLineWidth: CGFloat { max(3, scale * 0.52) }
 
-    func point(latticeX x: CGFloat, y: CGFloat) -> CGPoint {
+    public func point(latticeX x: CGFloat, y: CGFloat) -> CGPoint {
         CGPoint(x: origin.x + x * scale, y: origin.y + y * scale)
     }
 
-    func lattice(of point: CGPoint) -> CGPoint {
+    public func lattice(of point: CGPoint) -> CGPoint {
         CGPoint(x: (point.x - origin.x) / scale, y: (point.y - origin.y) / scale)
     }
 
     // MARK: - Dots
 
-    func point(of dot: Dot) -> CGPoint {
+    public func point(of dot: Dot) -> CGPoint {
         let position = dot.player == .blue
             ? board.blueDotPosition(row: dot.row, col: dot.col)
             : board.redDotPosition(row: dot.row, col: dot.col)
         return point(latticeX: CGFloat(position.x), y: CGFloat(position.y))
     }
 
-    func dots(for player: Player) -> [Dot] {
+    public func dots(for player: Player) -> [Dot] {
         let n = board.size
         let rows = player == .blue ? 0...n : 0...(n - 1)
         let cols = player == .blue ? 0...(n - 1) : 0...n
@@ -69,12 +79,12 @@ struct BoardGeometry {
     }
 
     /// The two screen points a move's edge runs between.
-    func endpoints(of move: Move, for player: Player) -> (CGPoint, CGPoint) {
+    public func endpoints(of move: Move, for player: Player) -> (CGPoint, CGPoint) {
         let (a, b) = board.endpoints(move, for: player)
         return (point(of: dot(ofID: a, player: player)), point(of: dot(ofID: b, player: player)))
     }
 
-    func center(of move: Move) -> CGPoint {
+    public func center(of move: Move) -> CGPoint {
         let position = board.center(of: move)
         return point(latticeX: CGFloat(position.x), y: CGFloat(position.y))
     }
@@ -86,7 +96,13 @@ struct BoardGeometry {
     /// Both families are searched, so tapping in the gap where you want a bridge
     /// finds it whichever grid it belongs to. Taken cells are skipped rather than
     /// swallowing the tap.
-    func nearestCell(to point: CGPoint, within radius: CGFloat = 1.4, isAllowed: (Move) -> Bool) -> Move? {
+    ///
+    /// The default radius is just over `√2`, which is the distance from one cell
+    /// centre to its nearest neighbour in the other family. Anything less and a
+    /// tap landing dead centre on an occupied cell finds nothing at all, while a
+    /// tap a hair off-centre falls through to a neighbour — the same gesture
+    /// giving two different answers.
+    public func nearestCell(to point: CGPoint, within radius: CGFloat = 1.5, isAllowed: (Move) -> Bool) -> Move? {
         let target = lattice(of: point)
         var best: (move: Move, distance: CGFloat)?
 
@@ -115,7 +131,7 @@ struct BoardGeometry {
     }
 
     /// The closest dot belonging to `player`.
-    func nearestDot(to point: CGPoint, for player: Player, within radius: CGFloat = 1.0) -> Dot? {
+    public func nearestDot(to point: CGPoint, for player: Player, within radius: CGFloat = 1.0) -> Dot? {
         let target = lattice(of: point)
         let n = board.size
         let row: Int
@@ -139,7 +155,7 @@ struct BoardGeometry {
     }
 
     /// The cell joining two adjacent dots of the same player, if they are adjacent.
-    func cell(between first: Dot, and second: Dot) -> Move? {
+    public func cell(between first: Dot, and second: Dot) -> Move? {
         guard first.player == second.player, first != second else { return nil }
         let n = board.size
         let rowGap = abs(first.row - second.row)

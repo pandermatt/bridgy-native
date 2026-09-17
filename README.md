@@ -34,8 +34,10 @@ game. The Perfect engine implements it and cannot be beaten when it moves first.
 
 ## Layout
 
-- `BridgyEngine/` — the rules and all AI, as a platform-agnostic SwiftPM package
+- `BridgyEngine/` — the rules, board geometry and all AI, as a platform-agnostic
+  SwiftPM package with no UI dependencies
 - `Bridgy/` — the SwiftUI app
+- `Tools/MakeIcon.swift` — draws the app icon; no artwork is checked in by hand
 
 ## Building
 
@@ -50,4 +52,9 @@ Engine tests run without Xcode:
 cd BridgyEngine && swift test
 ```
 
-Set `BRIDGY_DIAGNOSTICS=1` to include the engine strength matrix.
+Two opt-in diagnostics print strength tables instead of asserting:
+
+```sh
+BRIDGY_DIAGNOSTICS=1 swift test --filter Diagnostics   # engine head-to-head matrix
+BRIDGY_LADDER=1 swift test --filter LadderDiagnostics  # each level vs the one below
+```
