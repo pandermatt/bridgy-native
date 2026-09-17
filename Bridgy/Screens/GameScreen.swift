@@ -27,7 +27,7 @@ struct GameScreen: View {
         }
         .padding(.horizontal)
         .padding(.top, 8)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .navigationTitle(session.statusText)
         .navigationSubtitle(subtitle)
         #if os(iOS)
@@ -81,46 +81,42 @@ struct GameScreen: View {
 
     // MARK: - Toolbar
 
-    /// `.bottomBar` does not exist on macOS, so the same buttons go to the
-    /// primary action area there.
+    /// The board lives inside a tab, and a bottom bar would fight the tab bar
+    /// for the same strip of screen, so everything goes in the navigation bar:
+    /// the one or two actions you reach for constantly, and the rest behind an
+    /// overflow menu.
     @ToolbarContentBuilder
     private var actions: some ToolbarContent {
-        #if os(iOS)
-        ToolbarItemGroup(placement: .bottomBar) { buttons }
-        #else
-        ToolbarItemGroup(placement: .primaryAction) { buttons }
-        #endif
-    }
+        ToolbarItemGroup(placement: .primaryAction) {
+            if session.configuration.isWatchOnly {
+                Button {
+                    session.togglePause()
+                } label: {
+                    Label(session.isPaused ? "Play" : "Pause",
+                          systemImage: session.isPaused ? "play.fill" : "pause.fill")
+                }
+            } else {
+                Button { session.undo() } label: {
+                    Label("Undo", systemImage: "arrow.uturn.backward")
+                }
+                .disabled(!session.canUndo)
 
-    @ViewBuilder
-    private var buttons: some View {
-        if session.configuration.isWatchOnly {
-            Button {
-                session.togglePause()
+                Button { session.requestHint() } label: {
+                    Label("Hint", systemImage: "lightbulb")
+                }
+                .disabled(!session.isHumanTurn)
+            }
+
+            Menu {
+                Button { session.restart() } label: {
+                    Label("Restart", systemImage: "arrow.clockwise")
+                }
+                Button { model.session = nil } label: {
+                    Label("New Game", systemImage: "plus")
+                }
             } label: {
-                Label(session.isPaused ? "Play" : "Pause",
-                      systemImage: session.isPaused ? "play.fill" : "pause.fill")
+                Label("More", systemImage: "ellipsis")
             }
-        } else {
-            Button { session.undo() } label: {
-                Label("Undo", systemImage: "arrow.uturn.backward")
-            }
-            .disabled(!session.canUndo)
-
-            Button { session.requestHint() } label: {
-                Label("Hint", systemImage: "lightbulb")
-            }
-            .disabled(!session.isHumanTurn)
-        }
-
-        Spacer()
-
-        Button { session.restart() } label: {
-            Label("Restart", systemImage: "arrow.clockwise")
-        }
-
-        Button { model.session = nil } label: {
-            Label("New Game", systemImage: "plus")
         }
     }
 

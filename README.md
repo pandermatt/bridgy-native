@@ -46,6 +46,14 @@ xcodegen generate
 open Bridgy.xcodeproj
 ```
 
+## Tournament
+
+Every difficulty plays every other, in both colours, at each board size, and the
+results plot while the run is going: Elo ratings converging game by game, win
+rate against board size, and the first-player advantage measured per size. Win
+rates carry 95% Wilson intervals, because a tournament spends most of its time
+at sample sizes where a bare percentage means very little.
+
 Engine tests run without Xcode:
 
 ```sh

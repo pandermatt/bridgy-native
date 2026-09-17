@@ -1,195 +1,285 @@
 import BridgyEngine
+import Charts
 import SwiftUI
-import UniformTypeIdentifiers
 
-/// Runs every engine against every other and shows the table.
+/// Every engine against every other, plotted while it runs.
 struct TournamentScreen: View {
-    @Environment(AppModel.self) private var model
-
-    @State private var configuration = TournamentConfiguration(minimumSize: 4, maximumSize: 5, gamesPerColour: 3)
-    @State private var progress: Double = 0
-    @State private var result: TournamentResult?
-    @State private var runTask: Task<Void, Never>?
-    @State private var exportURL: URL?
-
-    private var isRunning: Bool { runTask != nil }
+    @State private var run = TournamentRun()
+    @State private var focus: String?
+    @State private var selectedGames: Int?
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                setupCard
-                if isRunning { progressCard }
-                if let result { resultsCard(result) }
+        List {
+            setupSection
+            if let analysis = run.analysis, analysis.gamesPlayed > 0 {
+                ratingsSection(analysis)
+                sizeSection(analysis)
+                firstPlayerSection(analysis)
+                headToHeadSection(analysis)
+                exportSection
             }
-            .padding(20)
-            .frame(maxWidth: 720)
-            .frame(maxWidth: .infinity)
         }
         .navigationTitle("Tournament")
-        .onDisappear { cancel() }
+        .onDisappear { run.stop() }
     }
 
     // MARK: - Setup
 
-    private var setupCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Every difficulty plays every other, in both colours, at each board size.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            stepper("Smallest board", value: $configuration.minimumSize, range: Board.minimumSize...12)
-            stepper("Largest board", value: $configuration.maximumSize, range: Board.minimumSize...12)
-            stepper("Games per colour", value: $configuration.gamesPerColour, range: 1...20)
-
-            HStack {
-                Label("\(configuration.totalGames(participants: Difficulty.allCases.count)) games", systemImage: "number")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if isRunning {
-                    Button("Stop", systemImage: "stop.fill") { cancel() }
-                        .buttonStyle(.glass)
-                } else {
-                    Button("Run", systemImage: "play.fill") { run() }
-                        .buttonStyle(.glassProminent)
-                }
+    private var setupSection: some View {
+        Section {
+            Stepper(value: $run.configuration.minimumSize, in: Board.minimumSize...12) {
+                LabeledContent("Smallest board", value: "\(run.configuration.minimumSize)")
             }
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func stepper(_ title: String, value: Binding<Int>, range: ClosedRange<Int>) -> some View {
-        Stepper(value: value, in: range) {
-            HStack {
-                Text(title)
-                Spacer()
-                Text("\(value.wrappedValue)")
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
+            Stepper(value: $run.configuration.maximumSize, in: Board.minimumSize...12) {
+                LabeledContent("Largest board", value: "\(run.configuration.maximumSize)")
             }
-        }
-        .disabled(isRunning)
-    }
+            Stepper(value: $run.configuration.gamesPerColour, in: 1...50) {
+                LabeledContent("Games per colour", value: "\(run.configuration.gamesPerColour)")
+            }
+            .disabled(run.isRunning)
 
-    private var progressCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ProgressView(value: progress)
-            Text("\(Int(progress * 100))% complete")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    // MARK: - Results
-
-    private func resultsCard(_ result: TournamentResult) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Standings").font(.headline)
-            ForEach(Array(result.standings.enumerated()), id: \.offset) { index, entry in
-                HStack {
-                    Text("\(index + 1).")
+            if run.isRunning {
+                VStack(alignment: .leading, spacing: 6) {
+                    ProgressView(value: run.progress)
+                    Text("\(run.analysis?.gamesPlayed ?? 0) of \(run.totalGames) games")
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
-                        .frame(width: 24, alignment: .trailing)
-                    Text(entry.name)
-                    Spacer()
-                    Text(entry.average, format: .percent.precision(.fractionLength(0)))
-                        .monospacedDigit()
                 }
-                .font(.callout)
+                Button("Stop", role: .destructive) { run.stop() }
+            } else {
+                Button("Run \(run.totalGames) Games") { run.start() }
             }
-
-            Divider()
-            Text("Head to head").font(.headline)
-            Text("Row's win rate against column.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            matrix(result)
-
-            if let exportURL {
-                ShareLink(item: exportURL) {
-                    Label("Export CSV", systemImage: "square.and.arrow.up")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                }
-                .buttonStyle(.glass)
-            }
+        } header: {
+            Text("Setup")
+        } footer: {
+            Text("Every difficulty plays every other, in both colours, at each board size. Win rates carry 95% Wilson intervals, so small samples look small.")
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func matrix(_ result: TournamentResult) -> some View {
-        ScrollView(.horizontal) {
-            Grid(alignment: .trailing, horizontalSpacing: 10, verticalSpacing: 6) {
-                GridRow {
-                    Text("").gridColumnAlignment(.leading)
-                    ForEach(result.participants, id: \.self) { name in
-                        Text(String(name.prefix(4)))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+    // MARK: - Ratings
+
+    private func ratingsSection(_ analysis: TournamentAnalysis) -> some View {
+        Section {
+            Chart(analysis.eloHistory) { sample in
+                LineMark(
+                    x: .value("Games", sample.games),
+                    y: .value("Rating", sample.rating)
+                )
+                .foregroundStyle(by: .value("Engine", sample.participant))
+                .interpolationMethod(.monotone)
+                .opacity(focus == nil || focus == sample.participant ? 1 : 0.18)
+            }
+            .chartXSelection(value: $selectedGames)
+            .chartYScale(domain: eloDomain(analysis))
+            .chartYAxisLabel("Elo")
+            .chartXAxisLabel("Games played")
+            .frame(height: 240)
+            .padding(.vertical, 4)
+
+            if let selectedGames, let readout = ratingReadout(analysis, at: selectedGames) {
+                Text(readout)
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Ratings")
+        } footer: {
+            Text("Elo, updated after every game from 1500. Drag across the chart to read the ratings at a point. Lines that have stopped separating mean the field has settled.")
+        }
+    }
+
+    /// Ratings span a few hundred points at most, so letting the axis start at
+    /// zero flattens exactly the separation the chart exists to show.
+    private func eloDomain(_ analysis: TournamentAnalysis) -> ClosedRange<Double> {
+        let ratings = analysis.eloHistory.map(\.rating)
+        guard let low = ratings.min(), let high = ratings.max(), high > low else {
+            return 1_400...1_600
+        }
+        let padding = max(30, (high - low) * 0.12)
+        return (low - padding)...(high + padding)
+    }
+
+    /// Ratings at the nearest sampled point to where the finger is.
+    private func ratingReadout(_ analysis: TournamentAnalysis, at games: Int) -> String? {
+        let candidates = Set(analysis.eloHistory.map(\.games))
+        guard let nearest = candidates.min(by: { abs($0 - games) < abs($1 - games) }) else { return nil }
+        let atPoint = analysis.eloHistory
+            .filter { $0.games == nearest }
+            .sorted { $0.rating > $1.rating }
+        guard !atPoint.isEmpty else { return nil }
+        let parts = atPoint.map { "\($0.participant) \(Int($0.rating.rounded()))" }
+        return "After \(nearest): " + parts.joined(separator: " · ")
+    }
+
+    // MARK: - Board size
+
+    private func sizeSection(_ analysis: TournamentAnalysis) -> some View {
+        Section {
+            Picker("Show intervals for", selection: $focus) {
+                Text("All engines").tag(String?.none)
+                ForEach(analysis.participants, id: \.self) { name in
+                    Text(name).tag(String?.some(name))
+                }
+            }
+            .pickerStyle(.menu)
+
+            Chart {
+                ForEach(analysis.sizePoints) { point in
+                    LineMark(
+                        x: .value("Board size", point.size),
+                        y: .value("Win rate", point.record.rate)
+                    )
+                    .foregroundStyle(by: .value("Engine", point.participant))
+                    .opacity(focus == nil || focus == point.participant ? 1 : 0.18)
+
+                    PointMark(
+                        x: .value("Board size", point.size),
+                        y: .value("Win rate", point.record.rate)
+                    )
+                    .foregroundStyle(by: .value("Engine", point.participant))
+                    .opacity(focus == nil || focus == point.participant ? 1 : 0.18)
+
+                    // Whiskers only for the focused engine: six overlapping
+                    // intervals at each size is unreadable.
+                    if focus == point.participant {
+                        RuleMark(
+                            x: .value("Board size", point.size),
+                            yStart: .value("Low", point.record.interval.low),
+                            yEnd: .value("High", point.record.interval.high)
+                        )
+                        .foregroundStyle(by: .value("Engine", point.participant))
+                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
+                        .opacity(0.5)
                     }
                 }
-                ForEach(Array(result.participants.enumerated()), id: \.offset) { row, name in
+            }
+            .chartYScale(domain: 0...1)
+            .chartYAxis {
+                AxisMarks(format: Decimal.FormatStyle.Percent.percent.precision(.fractionLength(0)))
+            }
+            // Without an explicit domain the axis starts at zero and squeezes
+            // every point into the right-hand edge.
+            .chartXScale(domain: sizeDomain(analysis))
+            .chartXAxis {
+                AxisMarks(values: analysis.configuration.sizes)
+            }
+            .chartXAxisLabel("Board size")
+            .frame(height: 220)
+            .padding(.vertical, 4)
+        } header: {
+            Text("Win rate by board size")
+        } footer: {
+            Text("How each engine holds up as the board grows. Pick an engine to see its confidence intervals.")
+        }
+    }
+
+    private func sizeDomain(_ analysis: TournamentAnalysis) -> ClosedRange<Int> {
+        let sizes = analysis.configuration.sizes
+        guard let low = sizes.first, let high = sizes.last, high > low else {
+            return (sizes.first ?? 2)...((sizes.last ?? 2) + 1)
+        }
+        return low...high
+    }
+
+    // MARK: - First player
+
+    private func firstPlayerSection(_ analysis: TournamentAnalysis) -> some View {
+        Section {
+            Chart {
+                ForEach(analysis.firstPlayerPoints) { point in
+                    BarMark(
+                        x: .value("Board size", "\(point.size)"),
+                        y: .value("Blue win rate", point.record.rate)
+                    )
+                    .foregroundStyle(.blue.opacity(0.7))
+
+                    RuleMark(
+                        x: .value("Board size", "\(point.size)"),
+                        yStart: .value("Low", point.record.interval.low),
+                        yEnd: .value("High", point.record.interval.high)
+                    )
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .foregroundStyle(.primary)
+                }
+                RuleMark(y: .value("Even", 0.5))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                    .foregroundStyle(.secondary)
+            }
+            .chartYScale(domain: 0...1)
+            .chartYAxis {
+                AxisMarks(format: Decimal.FormatStyle.Percent.percent.precision(.fractionLength(0)))
+            }
+            .frame(height: 200)
+            .padding(.vertical, 4)
+        } header: {
+            Text("First-player advantage")
+        } footer: {
+            Text("Blue moves first, and Bridg-It is provably a first-player win, so these bars should sit above the dashed line. If they do not, the field is too weak to exploit it — or something is wrong.")
+        }
+    }
+
+    // MARK: - Head to head
+
+    private func headToHeadSection(_ analysis: TournamentAnalysis) -> some View {
+        Section {
+            ScrollView(.horizontal) {
+                Grid(alignment: .trailing, horizontalSpacing: 12, verticalSpacing: 8) {
                     GridRow {
-                        Text(name)
-                            .font(.caption)
-                            .gridColumnAlignment(.leading)
-                        ForEach(result.participants.indices, id: \.self) { column in
-                            if row == column {
-                                Text("—").font(.caption2).foregroundStyle(.tertiary)
-                            } else {
-                                Text(result.winRate[row][column], format: .percent.precision(.fractionLength(0)))
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundStyle(result.winRate[row][column] >= 0.5 ? .primary : .secondary)
+                        Text("").gridColumnAlignment(.leading)
+                        ForEach(analysis.participants, id: \.self) { name in
+                            Text(String(name.prefix(4)))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    ForEach(Array(analysis.participants.enumerated()), id: \.offset) { row, name in
+                        GridRow {
+                            Text(name).font(.caption).gridColumnAlignment(.leading)
+                            ForEach(analysis.participants.indices, id: \.self) { column in
+                                if row == column {
+                                    Text("—").font(.caption2).foregroundStyle(.tertiary)
+                                } else {
+                                    let record = analysis.head(row, against: column)
+                                    VStack(spacing: 1) {
+                                        Text(record.rate, format: .percent.precision(.fractionLength(0)))
+                                            .font(.caption.monospacedDigit())
+                                        Text(record.interval.description())
+                                            .font(.system(size: 8).monospacedDigit())
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                             }
                         }
                     }
                 }
+                .padding(.vertical, 4)
             }
-            .padding(.vertical, 4)
-        }
-    }
 
-    // MARK: - Running
-
-    private func run() {
-        cancel()
-        progress = 0
-        result = nil
-        exportURL = nil
-        let settings = configuration
-        runTask = Task {
-            let participants = Tournament.defaultParticipants(forSize: settings.maximumSize)
-            let outcome = await Tournament.run(
-                configuration: settings,
-                participants: participants,
-                onProgress: { fraction in
-                    Task { @MainActor in progress = fraction }
+            ForEach(Array(analysis.standings.enumerated()), id: \.offset) { index, entry in
+                LabeledContent {
+                    Text("\(Int(entry.rating.rounded()))").monospacedDigit()
+                } label: {
+                    HStack {
+                        Text("\(index + 1).").foregroundStyle(.secondary).monospacedDigit()
+                        Text(entry.name)
+                    }
                 }
-            )
-            await MainActor.run {
-                runTask = nil
-                guard let outcome else { return }
-                result = outcome
-                exportURL = writeCSV(outcome)
             }
+        } header: {
+            Text("Head to head")
+        } footer: {
+            Text("Row's win rate against column, with its 95% interval underneath.")
         }
     }
 
-    private func cancel() {
-        runTask?.cancel()
-        runTask = nil
-    }
-
-    private func writeCSV(_ result: TournamentResult) -> URL? {
-        let url = URL.temporaryDirectory.appendingPathComponent("bridgy-tournament.csv")
-        guard let data = result.csv().data(using: .utf8) else { return nil }
-        try? data.write(to: url, options: .atomic)
-        return url
+    private var exportSection: some View {
+        Section {
+            if let url = run.exportURL() {
+                ShareLink(item: url) {
+                    Label("Export CSV", systemImage: "square.and.arrow.up")
+                }
+            }
+        }
     }
 }
