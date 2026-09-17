@@ -140,6 +140,12 @@ final class GameSession {
         cancelThinking()
     }
 
+    /// Picks up a new speed straight away instead of after the move in flight.
+    func paceChanged() {
+        guard configuration.isWatchOnly, !isPaused, !state.isOver else { return }
+        advance()
+    }
+
     // MARK: - Internals
 
     private func commit(_ move: Move) {
@@ -166,11 +172,17 @@ final class GameSession {
         guard case .computer(let level) = configuration.seat(for: state.current) else { return }
         guard !configuration.isWatchOnly || !isPaused else { return }
 
-        let engine = level.engine(forSize: state.board.size)
+        let watching = configuration.isWatchOnly
+        let pace = settings.watchPace
+        let engine = level.engine(
+            forSize: state.board.size,
+            thinkingBudget: watching ? pace.thinkingBudget : nil
+        )
         let snapshot = state
         // A pause before a computer move, so its reply does not appear to happen
-        // in the same instant as the tap that triggered it.
-        let pause = configuration.isWatchOnly ? settings.watchSpeed.delay : .milliseconds(220)
+        // in the same instant as the tap that triggered it. When watching, the
+        // pause *is* the requested pace.
+        let pause = watching ? pace.interval : .milliseconds(220)
 
         isThinking = true
         thinkingTask = Task { [weak self] in

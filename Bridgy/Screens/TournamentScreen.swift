@@ -25,7 +25,6 @@ struct TournamentScreen: View {
             .frame(maxWidth: 720)
             .frame(maxWidth: .infinity)
         }
-        .background { BackdropView(backdrop: model.settings.backdrop) }
         .navigationTitle("Tournament")
         .onDisappear { cancel() }
     }
@@ -59,7 +58,6 @@ struct TournamentScreen: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 22))
     }
 
     private func stepper(_ title: String, value: Binding<Int>, range: ClosedRange<Int>) -> some View {
@@ -84,7 +82,6 @@ struct TournamentScreen: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 22))
     }
 
     // MARK: - Results
@@ -124,7 +121,6 @@ struct TournamentScreen: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 22))
     }
 
     private func matrix(_ result: TournamentResult) -> some View {

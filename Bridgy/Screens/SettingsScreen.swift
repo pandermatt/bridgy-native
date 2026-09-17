@@ -7,23 +7,14 @@ struct SettingsScreen: View {
     var body: some View {
         @Bindable var settings = model.settings
         Form {
-            Section("Backdrop") {
-                Picker("Gradient", selection: $settings.backdrop) {
-                    ForEach(Backdrop.allCases) { backdrop in
-                        Text(backdrop.displayName).tag(backdrop)
-                    }
-                }
-                swatches(selection: $settings.backdrop)
-            }
-
-            Section("Colours") {
+            Section {
                 Picker("Players", selection: $settings.colorway) {
                     ForEach(Colorway.allCases) { colorway in
                         Text(colorway.displayName).tag(colorway)
                     }
                 }
-                .pickerStyle(.segmented)
-                HStack(spacing: 14) {
+                .pickerStyle(.inline)
+                HStack(spacing: 16) {
                     ForEach(Player.allCases, id: \.self) { player in
                         Label {
                             Text(player.displayName)
@@ -32,12 +23,13 @@ struct SettingsScreen: View {
                                 .fill(settings.colorway.color(for: player))
                                 .frame(width: 14, height: 14)
                         }
-                        .font(.caption)
                     }
                 }
+                .font(.footnote)
+            } header: {
+                Text("Colours")
+            } footer: {
                 Text(settings.colorway.detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             Section("Board") {
@@ -52,52 +44,23 @@ struct SettingsScreen: View {
             }
 
             Section {
-                Picker("Speed", selection: $settings.watchSpeed) {
-                    ForEach(WatchSpeed.allCases) { speed in
-                        Label(speed.displayName, systemImage: speed.symbolName).tag(speed)
-                    }
-                }
-                .pickerStyle(.segmented)
+                WatchPaceControls(pace: $settings.watchPace)
             } header: {
                 Text("Watching two computers")
-            } footer: {
-                Text("How long to pause between their moves.")
+            }
+
+            Section {
+                NavigationLink {
+                    AboutScreen()
+                } label: {
+                    Label("About Bridgy", systemImage: "info.circle")
+                }
             }
         }
         .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .background { BackdropView(backdrop: settings.backdrop) }
         .navigationTitle("Settings")
         .onChange(of: settings.soundEnabled) { _, enabled in
             if enabled { model.sound.prepare() }
         }
-    }
-
-    private func swatches(selection: Binding<Backdrop>) -> some View {
-        HStack(spacing: 10) {
-            ForEach(Backdrop.allCases) { backdrop in
-                Button {
-                    selection.wrappedValue = backdrop
-                } label: {
-                    RoundedRectangle(cornerRadius: 9)
-                        .fill(LinearGradient(
-                            colors: backdrop.swatch(for: .dark),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                        .frame(height: 38)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 9)
-                                .strokeBorder(
-                                    selection.wrappedValue == backdrop ? Color.accentColor : .clear,
-                                    lineWidth: 2.5
-                                )
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(backdrop.displayName)
-            }
-        }
-        .padding(.vertical, 4)
     }
 }

@@ -2,51 +2,6 @@ import BridgyEngine
 import Observation
 import SwiftUI
 
-/// Where the app can navigate.
-enum Destination: String, Hashable, Identifiable, CaseIterable {
-    case play
-    case watch
-    case tournament
-    case howToPlay
-    case settings
-    case about
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .play: return "Play"
-        case .watch: return "Watch"
-        case .tournament: return "Tournament"
-        case .howToPlay: return "How to Play"
-        case .settings: return "Settings"
-        case .about: return "About"
-        }
-    }
-
-    var symbolName: String {
-        switch self {
-        case .play: return "play.circle"
-        case .watch: return "cpu"
-        case .tournament: return "trophy"
-        case .howToPlay: return "questionmark.circle"
-        case .settings: return "gearshape"
-        case .about: return "info.circle"
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .play: return "Against the computer, or side by side"
-        case .watch: return "Let two engines play it out"
-        case .tournament: return "Every engine against every other"
-        case .howToPlay: return "The rules, in a minute"
-        case .settings: return "Colours, sound, and the board"
-        case .about: return "Gale, Gross, and a solved game"
-        }
-    }
-}
-
 /// App-wide state: preferences, audio, and the game in progress.
 @MainActor
 @Observable

@@ -1,4 +1,5 @@
 import BridgyEngine
+import Foundation
 import SwiftUI
 
 /// The two player colours.
@@ -49,5 +50,20 @@ extension Player {
 
     var symbolName: String {
         self == .blue ? "arrow.up.and.down" : "arrow.left.and.right"
+    }
+}
+
+extension Color {
+    /// `RRGGBB`, the form the player palettes are written in.
+    init(hex: String) {
+        var value: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&value)
+        self.init(
+            .sRGB,
+            red: Double((value >> 16) & 0xFF) / 255,
+            green: Double((value >> 8) & 0xFF) / 255,
+            blue: Double(value & 0xFF) / 255,
+            opacity: 1
+        )
     }
 }

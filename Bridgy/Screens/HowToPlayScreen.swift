@@ -7,56 +7,47 @@ struct HowToPlayScreen: View {
     @State private var demo = DemoBoard()
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                demoCard
+        List {
+            Section {
+                VStack(spacing: 12) {
+                    DemoBoardView(state: demo.state, settings: model.settings)
+                        .frame(maxWidth: 260)
+                        .frame(height: 260)
+                        .frame(maxWidth: .infinity)
+                    Text(demo.caption)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .animation(.default, value: demo.caption)
+                }
+                .padding(.vertical, 8)
+            }
+
+            Section {
                 rule("Two grids, interleaved", "square.grid.3x3", """
-                Blue owns one grid of dots, red the other. They overlap so that every \
-                bridge blue could build crosses exactly one bridge red could build.
+                Blue owns one grid of dots, red the other. They overlap so that every bridge blue \
+                could build crosses exactly one bridge red could build.
                 """)
                 rule("Join your own dots", "hand.tap", """
-                Tap the gap between two of your dots to bridge them. Taking a gap also \
-                denies it to your opponent, so every move builds and blocks at once.
+                Tap the gap between two of your dots to bridge them. Taking a gap also denies it to \
+                your opponent, so every move builds and blocks at once.
                 """)
                 rule("Cross the board", "arrow.up.and.down", """
-                Blue moves first and needs an unbroken chain from top to bottom. \
-                Red needs one from left to right.
+                Blue moves first and needs an unbroken chain from top to bottom. Red needs one from \
+                left to right.
                 """)
                 rule("Somebody always wins", "checkmark", """
-                There are no draws. When the board fills, exactly one player has crossed it — \
-                and it cannot be both, because their bridges would have to cross.
+                There are no draws. When the board fills, exactly one player has crossed it — and it \
+                cannot be both, because their bridges would have to cross.
                 """)
             }
-            .padding(20)
-            .frame(maxWidth: 640)
-            .frame(maxWidth: .infinity)
         }
-        .background { BackdropView(backdrop: model.settings.backdrop) }
         .navigationTitle("How to Play")
         .task { await demo.run() }
     }
 
-    private var demoCard: some View {
-        VStack(spacing: 12) {
-            DemoBoardView(state: demo.state, settings: model.settings)
-                .frame(maxWidth: 260)
-                .frame(height: 260)
-            Text(demo.caption)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .animation(.default, value: demo.caption)
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity)
-        .glassEffect(.regular, in: .rect(cornerRadius: 22))
-    }
-
     private func rule(_ title: String, _ symbol: String, _ body: String) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: symbol)
-                .font(.title3)
-                .frame(width: 28)
-                .foregroundStyle(.tint)
+        Label {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.headline)
                 Text(body)
@@ -64,10 +55,11 @@ struct HowToPlayScreen: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        } icon: {
+            Image(systemName: symbol).foregroundStyle(.tint)
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 22))
+        .labelStyle(.titleAndIcon)
+        .padding(.vertical, 4)
     }
 }
 

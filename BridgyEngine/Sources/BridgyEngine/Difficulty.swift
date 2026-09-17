@@ -69,7 +69,11 @@ public enum Difficulty: String, Sendable, Hashable, Codable, CaseIterable, Ident
     }
 
     /// Builds the engine for this level, tuned to the board.
-    public func engine(forSize size: Int) -> any Engine {
+    /// `thinkingBudget` caps how long a searching engine may take. It exists so
+    /// that watching two computers at speed can hold the requested rate: the only
+    /// engine it affects is Monte Carlo, which then simply searches less. The
+    /// others are effectively instant and ignore it.
+    public func engine(forSize size: Int, thinkingBudget: Duration? = nil) -> any Engine {
         switch self {
         case .easy:
             return RandomEngine()
@@ -80,9 +84,11 @@ public enum Difficulty: String, Sendable, Hashable, Codable, CaseIterable, Ident
         case .hard:
             return ShortestPathEngine(strategy: .balanced, tieBreak: .avoidConnection)
         case .expert:
-            return Self.expertEngine(forSize: size)
+            return Self.expertEngine(forSize: size, thinkingBudget: thinkingBudget)
         case .perfect:
-            return PerfectEngine(fallback: Self.expertEngine(forSize: size))
+            return PerfectEngine(
+                fallback: Self.expertEngine(forSize: size, thinkingBudget: thinkingBudget)
+            )
         }
     }
 
@@ -104,12 +110,14 @@ public enum Difficulty: String, Sendable, Hashable, Codable, CaseIterable, Ident
         }
     }
 
-    private static func expertEngine(forSize size: Int) -> any Engine {
+    private static func expertEngine(forSize size: Int, thinkingBudget: Duration? = nil) -> any Engine {
         guard size <= searchSizeLimit else {
             return ShortestPathEngine(strategy: .balanced, tieBreak: .disturbOpponent)
         }
         // Bigger boards need longer to search, but not without limit.
         let milliseconds = min(2_000, 400 + size * size * 12)
-        return MCTSEngine(timeBudget: .milliseconds(milliseconds))
+        var budget = Duration.milliseconds(milliseconds)
+        if let thinkingBudget, thinkingBudget < budget { budget = thinkingBudget }
+        return MCTSEngine(timeBudget: budget)
     }
 }
