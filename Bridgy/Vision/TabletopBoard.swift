@@ -67,6 +67,11 @@ struct BoardMetrics {
         plane(geometry.point(of: dot))
     }
 
+    /// Same place as the dot; named for what it is in the water.
+    func postCentre(_ dot: BoardGeometry.Dot) -> SIMD3<Float> {
+        dotCentre(dot)
+    }
+
     func dots(for player: BoardSide) -> [BoardGeometry.Dot] {
         geometry.dots(for: player)
     }
@@ -148,7 +153,9 @@ struct TabletopBoardBuilder {
             setup.add(seat: seat)
         }
 
-        for dot in dotEntities(metrics) { surface.addChild(dot) }
+        for bank in bankEntities(metrics) { root.addChild(bank) }
+        for post in postEntities(metrics) { surface.addChild(post) }
+        root.addChild(lightEntity())
 
         var slots: [BridgeSlot] = []
         slots.reserveCapacity(board.cellCount)
@@ -183,46 +190,147 @@ struct TabletopBoardBuilder {
         )
     }
 
-    /// The playing surface is this thick; the tabletop shape has to agree.
-    static let surfaceThickness = 0.012
+    /// The water is this deep; the tabletop shape has to agree.
+    static let surfaceThickness = 0.05
 
+    /// The stretch of water the bridges cross.
+    ///
+    /// Physically based rather than unlit, because water is entirely about how
+    /// it catches the light — which means the scene has to carry its own
+    /// lighting (see `lightEntity`), since a mixed immersive space gives it
+    /// almost nothing to reflect.
     private func surfaceEntity(_ metrics: BoardMetrics) -> Entity {
-        let thickness = Self.surfaceThickness
         let mesh = MeshResource.generateBox(
             width: Float(metrics.side),
-            height: Float(thickness),
+            height: Float(Self.surfaceThickness),
             depth: Float(metrics.side),
-            cornerRadius: Float(metrics.unit * 0.2)
+            cornerRadius: Float(metrics.unit * 0.12)
         )
-        // Unlit throughout. A mixed immersive space lights physically-based
-        // materials from the surroundings, and in the simulator there is
-        // essentially nothing to reflect, so a PBR board renders invisible.
-        // Flat colour is also simply what this game looks like.
-        let material = UnlitMaterial(color: UIColor(white: 0.10, alpha: 1))
+        var material = PhysicallyBasedMaterial()
+        material.baseColor = .init(tint: UIColor(red: 0.05, green: 0.20, blue: 0.35, alpha: 1))
+        material.roughness = 0.08
+        material.metallic = 0.15
+        material.clearcoat = .init(floatLiteral: 0.9)
+        material.clearcoatRoughness = .init(floatLiteral: 0.06)
         let entity = ModelEntity(mesh: mesh, materials: [material])
-        entity.name = "tabletop"
+        entity.name = "water"
+        entity.addChild(shimmerEntity(metrics))
         return entity
     }
 
-    /// The lattice itself. Always drawn here, whatever the 2D style says:
-    /// without dots a bare table gives you nothing to aim a bridge at.
-    private func dotEntities(_ metrics: BoardMetrics) -> [Entity] {
-        var entities: [Entity] = []
-        let radius = Float(metrics.dotRadius)
-        let mesh = MeshResource.generateSphere(radius: radius)
-        for player in BoardSide.allCases {
-            let material = UnlitMaterial(
-                color: theme.materialColor(for: player).withAlphaComponent(0.55)
+    /// Two broad, near-transparent sheets drifting across each other just above
+    /// the surface. Cheaper than displacing a mesh every frame, and at a glance
+    /// it reads as moving water rather than a blue slab.
+    private func shimmerEntity(_ metrics: BoardMetrics) -> Entity {
+        let holder = Entity()
+        for (index, tint) in [
+            UIColor(red: 0.45, green: 0.75, blue: 0.95, alpha: 0.10),
+            UIColor(red: 0.30, green: 0.90, blue: 0.95, alpha: 0.07)
+        ].enumerated() {
+            let mesh = MeshResource.generateBox(
+                width: Float(metrics.side * 0.8),
+                height: 0.001,
+                depth: Float(metrics.side * 0.8),
+                cornerRadius: Float(metrics.side * 0.4)
             )
+            var material = UnlitMaterial(color: tint)
+            material.blending = .transparent(opacity: .init(floatLiteral: 1))
+            let sheet = ModelEntity(mesh: mesh, materials: [material])
+            sheet.position = SIMD3(0, Float(Self.surfaceThickness / 2 + 0.002 + Double(index) * 0.002), 0)
+
+            let drift = Float(metrics.unit * 1.4)
+            let direction: Float = index == 0 ? 1 : -1
+            sheet.position.x -= drift * direction
+            var away = sheet.transform
+            away.translation.x += drift * 2 * direction
+            sheet.move(
+                to: away,
+                relativeTo: holder,
+                duration: 9 + Double(index) * 4,
+                timingFunction: .easeInOut
+            )
+            holder.addChild(sheet)
+        }
+        return holder
+    }
+
+    /// The four banks: the shores each player is trying to join.
+    ///
+    /// The 2D board never showed this. Here it is the whole point — Down can see
+    /// its own two shores ahead and behind, Across sees its own left and right.
+    private func bankEntities(_ metrics: BoardMetrics) -> [Entity] {
+        let depth = Float(metrics.unit * 1.15)
+        let height = Float(Self.surfaceThickness * 0.55)
+        let reach = Float(metrics.side) / 2 + depth / 2
+
+        var banks: [Entity] = []
+        for side in BoardSide.allCases {
+            let alongZ = side == .blue
+            // Only one pair runs the full width. If both did they would overlap
+            // at all four corners and z-fight, which is exactly what it looked
+            // like — the corners of the near bank fizzing red and blue.
+            let length = alongZ
+                ? Float(metrics.side) + depth * 2
+                : Float(metrics.side)
+            let mesh = MeshResource.generateBox(
+                width: alongZ ? length : depth,
+                height: height,
+                depth: alongZ ? depth : length,
+                cornerRadius: depth * 0.16
+            )
+            var material = PhysicallyBasedMaterial()
+            material.baseColor = .init(tint: theme.materialColor(for: side).withAlphaComponent(0.85))
+            material.roughness = 0.75
+            for sign in [Float(-1), Float(1)] {
+                let bank = ModelEntity(mesh: mesh, materials: [material])
+                bank.position = alongZ
+                    ? SIMD3(0, height * 0.1, sign * reach)
+                    : SIMD3(sign * reach, height * 0.1, 0)
+                banks.append(bank)
+            }
+        }
+        return banks
+    }
+
+    /// The lattice, as posts standing in the water rather than dots on a board.
+    private func postEntities(_ metrics: BoardMetrics) -> [Entity] {
+        var entities: [Entity] = []
+        let radius = Float(metrics.dotRadius * 0.85)
+        let height = Float(metrics.unit * 0.9)
+        let mesh = MeshResource.generateCylinder(height: height, radius: radius)
+
+        for player in BoardSide.allCases {
+            var material = PhysicallyBasedMaterial()
+            material.baseColor = .init(tint: theme.materialColor(for: player))
+            material.roughness = 0.55
             for dot in metrics.dots(for: player) {
-                let entity = ModelEntity(mesh: mesh, materials: [material])
-                var position = metrics.dotCentre(dot)
-                position.y = Float(metrics.unit * 0.10)
-                entity.position = position
-                entities.append(entity)
+                let post = ModelEntity(mesh: mesh, materials: [material])
+                var position = metrics.postCentre(dot)
+                position.y = Float(Self.surfaceThickness / 2) + height / 2 - Float(metrics.unit * 0.12)
+                post.position = position
+                entities.append(post)
             }
         }
         return entities
+    }
+
+    /// One key light plus a soft fill, so the water has something to catch.
+    private func lightEntity() -> Entity {
+        let holder = Entity()
+
+        let key = DirectionalLight()
+        key.light.intensity = 2600
+        key.light.color = .white
+        key.look(at: .zero, from: SIMD3(0.6, 1.4, 0.5), relativeTo: nil)
+        holder.addChild(key)
+
+        let fill = DirectionalLight()
+        fill.light.intensity = 900
+        fill.light.color = UIColor(red: 0.75, green: 0.88, blue: 1, alpha: 1)
+        fill.look(at: .zero, from: SIMD3(-0.8, 0.7, -0.6), relativeTo: nil)
+        holder.addChild(fill)
+
+        return holder
     }
 
     /// Down sits at the near edge, Across to its left — matching the directions
@@ -316,20 +424,58 @@ final class TabletopBoard {
         bridges.removeAll()
     }
 
+    /// A bridge rather than a bar: a deck with a rail down each side, lifted
+    /// clear of the water and spanning between two of that player's posts.
     private func bridgeEntity(cell: Int, player: BoardSide) -> Entity {
-        let thickness = Float(metrics.bridgeThickness(style))
+        let deckWidth = Float(metrics.bridgeThickness(style))
         let length = Float(metrics.bridgeLength)
+        let deckHeight = deckWidth * 0.34
         let alongZ = metrics.runsAlongZ(cell: cell, player: player)
-        let mesh = MeshResource.generateBox(
-            width: alongZ ? thickness : length,
-            height: thickness,
-            depth: alongZ ? length : thickness,
-            cornerRadius: thickness * 0.45
+
+        let colour = theme.materialColor(for: player)
+        var deckMaterial = PhysicallyBasedMaterial()
+        deckMaterial.baseColor = .init(tint: colour)
+        deckMaterial.roughness = 0.45
+
+        var railMaterial = PhysicallyBasedMaterial()
+        railMaterial.baseColor = .init(tint: colour.lighter(by: 0.22))
+        railMaterial.roughness = 0.3
+
+        let bridge = Entity()
+
+        let deck = ModelEntity(
+            mesh: .generateBox(
+                width: alongZ ? deckWidth : length,
+                height: deckHeight,
+                depth: alongZ ? length : deckWidth,
+                cornerRadius: deckHeight * 0.4
+            ),
+            materials: [deckMaterial]
         )
-        let material = UnlitMaterial(color: theme.materialColor(for: player))
-        let entity = ModelEntity(mesh: mesh, materials: [material])
-        entity.position = SIMD3(0, thickness * 0.5 + 0.006, 0)
-        return entity
+        bridge.addChild(deck)
+
+        let railThickness = deckWidth * 0.16
+        let railHeight = deckWidth * 0.42
+        for sign in [Float(-1), Float(1)] {
+            let rail = ModelEntity(
+                mesh: .generateBox(
+                    width: alongZ ? railThickness : length * 0.94,
+                    height: railHeight,
+                    depth: alongZ ? length * 0.94 : railThickness,
+                    cornerRadius: railThickness * 0.5
+                ),
+                materials: [railMaterial]
+            )
+            let offset = (deckWidth - railThickness) / 2 * sign
+            rail.position = alongZ
+                ? SIMD3(offset, deckHeight / 2 + railHeight / 2, 0)
+                : SIMD3(0, deckHeight / 2 + railHeight / 2, offset)
+            bridge.addChild(rail)
+        }
+
+        // Clear of the water, level with the tops of the posts it joins.
+        bridge.position = SIMD3(0, Float(metrics.unit * 0.62), 0)
+        return bridge
     }
 }
 
@@ -337,6 +483,22 @@ private extension BoardTheme {
     /// RealityKit materials want a platform colour, not a SwiftUI one.
     func materialColor(for player: BoardSide) -> UIColor {
         UIColor(color(for: player))
+    }
+}
+
+private extension UIColor {
+    /// A lighter version of the player's colour, for the rails.
+    func lighter(by amount: CGFloat) -> UIColor {
+        var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
+        guard getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha) else {
+            return self
+        }
+        return UIColor(
+            hue: hue,
+            saturation: max(0, saturation - amount * 0.5),
+            brightness: min(1, brightness + amount),
+            alpha: alpha
+        )
     }
 }
 #endif

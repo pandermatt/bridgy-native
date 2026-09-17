@@ -31,7 +31,7 @@ struct ImmersiveBoardView: View {
             // rather than following the head around like a HUD.
             let anchor = AnchorEntity(.head)
             anchor.anchoring.trackingMode = .once
-            table.root.position = SIMD3(0, -0.45, -0.95)
+            table.root.position = SIMD3(0, -0.24, -1.05)
             anchor.addChild(table.root)
             content.add(anchor)
         }
