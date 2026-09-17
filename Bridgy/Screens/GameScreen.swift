@@ -17,7 +17,7 @@ struct GameScreen: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             .navigationTitle(session.statusText)
             .navigationSubtitle(subtitle)
-            .toolbar { actions }
+            .toolbar { actions(settings: $settings) }
             .gameScreenTitleDisplayMode()
             .modifier(GameFeedback(session: session, settings: model.settings, isWatching: isWatching))
             .onAppear { session.begin() }
@@ -29,7 +29,8 @@ struct GameScreen: View {
                     state: session.state,
                     configuration: session.configuration,
                     theme: model.settings.theme,
-                    style: $settings.boardStyle,
+                    cap: model.settings.bridgeCap,
+                    initialStyle: model.settings.boardStyle,
                     onPlayAgain: { session.restart() },
                     onChangeSetup: { model.session = nil }
                 )
@@ -135,8 +136,13 @@ struct GameScreen: View {
 
     /// Watch mode gets a media transport. "Restart" tucked in a menu is not what
     /// someone reaching for "stop" is looking for.
+    ///
+    /// The overflow menu is on both sides of that branch, because how the board
+    /// is drawn is worth changing mid-game — most of all while watching, where
+    /// the dot-less styles are the point — and Settings is a long way to go for
+    /// it.
     @ToolbarContentBuilder
-    private var actions: some ToolbarContent {
+    private func actions(settings: Bindable<AppSettings>) -> some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             if isWatching {
                 Button {
@@ -161,18 +167,61 @@ struct GameScreen: View {
                     Label("Hint", systemImage: "lightbulb")
                 }
                 .disabled(!session.isHumanTurn)
+            }
 
-                Menu {
+            Menu {
+                appearanceItems(settings: settings)
+                if !isWatching {
+                    Divider()
                     Button { session.restart() } label: {
                         Label("Restart", systemImage: "arrow.clockwise")
                     }
                     Button { model.session = nil } label: {
                         Label("New Game", systemImage: "plus")
                     }
-                } label: {
-                    Label("More", systemImage: "ellipsis")
+                }
+            } label: {
+                Label("More", systemImage: "ellipsis")
+            }
+        }
+    }
+
+    /// The same two choices Settings offers, reachable without leaving the game.
+    /// These do persist — unlike the result sheet's picker, which only dresses
+    /// the picture being shared.
+    @ViewBuilder
+    private func appearanceItems(settings: Bindable<AppSettings>) -> some View {
+        // Each one is its own submenu. A Picker placed directly in a Menu is
+        // rendered inline whatever its pickerStyle, which put three unlabelled
+        // lists end to end and two entries called "Classic".
+        Menu {
+            Picker("Board Style", selection: settings.boardStyle) {
+                ForEach(BoardStyle.allCases) { style in
+                    Text(style.displayName).tag(style)
                 }
             }
+        } label: {
+            Label("Board Style", systemImage: "square.grid.2x2")
+        }
+
+        Menu {
+            Picker("Colours", selection: settings.theme) {
+                ForEach(BoardTheme.allCases) { theme in
+                    Text(theme.displayName).tag(theme)
+                }
+            }
+        } label: {
+            Label("Colours", systemImage: "paintpalette")
+        }
+
+        Menu {
+            Picker("Bridge Ends", selection: settings.bridgeCap) {
+                ForEach(BridgeCap.allCases) { cap in
+                    Text(cap.displayName).tag(cap)
+                }
+            }
+        } label: {
+            Label("Bridge Ends", systemImage: "capsule")
         }
     }
 }

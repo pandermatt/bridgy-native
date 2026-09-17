@@ -14,7 +14,8 @@ struct HowToPlayScreen: View {
                     BoardCanvas(
                         state: demo.state,
                         theme: model.settings.theme,
-                        style: model.settings.boardStyle
+                        style: model.settings.boardStyle,
+                        cap: model.settings.bridgeCap
                     )
                     .aspectRatio(1, contentMode: .fit)
                     .frame(maxWidth: 260)

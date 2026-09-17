@@ -190,6 +190,14 @@ final class GameSession {
         store.clear()
     }
 
+    /// Leaving the Play tab: stop working and latch paused, so nothing carries
+    /// on thinking or sounding in the background while another tab is up. The
+    /// game itself is kept, and comes back as Continue.
+    func suspend() {
+        isPaused = true
+        stop()
+    }
+
     /// Leaving the screen: stop working, but keep the game.
     func stop() {
         cancelThinking()

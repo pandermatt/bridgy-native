@@ -9,6 +9,7 @@ struct BoardCanvas: View {
     let state: GameState
     let theme: BoardTheme
     let style: BoardStyle
+    var cap: BridgeCap = .rounded
     /// Ghosted cell under the pointer, on devices that have one.
     var candidate: Move?
     /// Suggested move, ringed rather than played.
@@ -104,13 +105,13 @@ struct BoardCanvas: View {
                 context.stroke(
                     path,
                     with: .color(colour.opacity(0.35 * opacity)),
-                    style: StrokeStyle(lineWidth: stroke * 2.6, lineCap: .round, lineJoin: .round)
+                    style: StrokeStyle(lineWidth: stroke * 2.6, lineCap: cap.lineCap, lineJoin: cap.lineJoin)
                 )
             }
             context.stroke(
                 path,
                 with: .color(colour.opacity(opacity)),
-                style: StrokeStyle(lineWidth: stroke, lineCap: .round, lineJoin: .round)
+                style: StrokeStyle(lineWidth: stroke, lineCap: cap.lineCap, lineJoin: cap.lineJoin)
             )
         }
 
@@ -132,18 +133,18 @@ struct BoardCanvas: View {
             context.stroke(
                 path,
                 with: .color(.white.opacity(0.45 * opacity)),
-                style: StrokeStyle(lineWidth: stroke * 0.28, lineCap: .round)
+                style: StrokeStyle(lineWidth: stroke * 0.28, lineCap: cap.lineCap)
             )
         } else {
             context.stroke(
                 path,
                 with: .color(colour.opacity(0.35 * opacity)),
-                style: StrokeStyle(lineWidth: stroke * 2.1, lineCap: .round)
+                style: StrokeStyle(lineWidth: stroke * 2.1, lineCap: cap.lineCap)
             )
             context.stroke(
                 path,
                 with: .color(colour.opacity(opacity)),
-                style: StrokeStyle(lineWidth: stroke, lineCap: .round)
+                style: StrokeStyle(lineWidth: stroke, lineCap: cap.lineCap)
             )
         }
     }
@@ -157,7 +158,7 @@ struct BoardCanvas: View {
         context.stroke(
             path,
             with: .color(theme.color(for: state.current).opacity(0.4)),
-            style: StrokeStyle(lineWidth: width(geometry), lineCap: .round)
+            style: StrokeStyle(lineWidth: width(geometry), lineCap: cap.lineCap)
         )
     }
 

@@ -23,6 +23,7 @@ struct BoardView: View {
                 state: session.state,
                 theme: settings.theme,
                 style: settings.boardStyle,
+                cap: settings.bridgeCap,
                 candidate: candidate(in: geometry),
                 hint: session.hintMove
             )

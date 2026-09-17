@@ -39,6 +39,12 @@ struct SettingsScreen: View {
                         }
                     }
                 }
+                Picker("Bridge ends", selection: $settings.bridgeCap) {
+                    ForEach(BridgeCap.allCases) { cap in
+                        Text(cap.displayName).tag(cap)
+                    }
+                }
+                .pickerStyle(.segmented)
             } header: {
                 Text("Board style")
             } footer: {

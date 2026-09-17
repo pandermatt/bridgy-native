@@ -10,12 +10,35 @@ struct ResultSheet: View {
     let state: GameState
     let configuration: GameConfiguration
     let theme: BoardTheme
-    @Binding var style: BoardStyle
+    let cap: BridgeCap
     var onPlayAgain: () -> Void
     var onChangeSetup: () -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var shareURL: URL?
+
+    /// Local to this sheet on purpose: picking a style here is about the picture
+    /// being shared, not about how the next game will be drawn. The board style
+    /// proper is changed from the game's own toolbar or from Settings.
+    @State private var style: BoardStyle
+
+    init(
+        state: GameState,
+        configuration: GameConfiguration,
+        theme: BoardTheme,
+        cap: BridgeCap,
+        initialStyle: BoardStyle,
+        onPlayAgain: @escaping () -> Void,
+        onChangeSetup: @escaping () -> Void
+    ) {
+        self.state = state
+        self.configuration = configuration
+        self.theme = theme
+        self.cap = cap
+        self.onPlayAgain = onPlayAgain
+        self.onChangeSetup = onChangeSetup
+        _style = State(initialValue: initialStyle)
+    }
 
     var body: some View {
         NavigationStack {
@@ -44,7 +67,7 @@ struct ResultSheet: View {
     }
 
     private var board: some View {
-        BoardCanvas(state: state, theme: theme, style: style, highlightsLastMove: false)
+        BoardCanvas(state: state, theme: theme, style: style, cap: cap, highlightsLastMove: false)
             .aspectRatio(1, contentMode: .fit)
             .padding(12)
             .background {
@@ -55,7 +78,7 @@ struct ResultSheet: View {
 
     private var stylePicker: some View {
         VStack(spacing: 6) {
-            Picker("Style", selection: $style) {
+            Picker("Picture style", selection: $style) {
                 ForEach(BoardStyle.allCases) { option in
                     Text(option.displayName).tag(option)
                 }
@@ -118,6 +141,7 @@ struct ResultSheet: View {
                 state: state,
                 theme: theme,
                 style: style,
+                cap: cap,
                 caption: "\(title) · \(subtitle)"
             )
         )
@@ -137,11 +161,12 @@ struct ShareableBoard: View {
     let state: GameState
     let theme: BoardTheme
     let style: BoardStyle
+    let cap: BridgeCap
     let caption: String
 
     var body: some View {
         VStack(spacing: 18) {
-            BoardCanvas(state: state, theme: theme, style: style, highlightsLastMove: false)
+            BoardCanvas(state: state, theme: theme, style: style, cap: cap, highlightsLastMove: false)
                 .frame(width: 440, height: 440)
             Text(caption)
                 .font(.system(size: 17, weight: .medium, design: .rounded))

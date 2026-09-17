@@ -10,6 +10,7 @@ final class AppSettings {
 
     var theme: BoardTheme { didSet { store(theme.rawValue, "boardTheme") } }
     var boardStyle: BoardStyle { didSet { store(boardStyle.rawValue, "boardStyle") } }
+    var bridgeCap: BridgeCap { didSet { store(bridgeCap.rawValue, "bridgeCap") } }
     var soundEnabled: Bool { didSet { store(soundEnabled, "soundEnabled") } }
     var hapticsEnabled: Bool { didSet { store(hapticsEnabled, "hapticsEnabled") } }
     var showHints: Bool { didSet { store(showHints, "showHints") } }
@@ -44,6 +45,8 @@ final class AppSettings {
         } else {
             boardStyle = .classic
         }
+
+        bridgeCap = BridgeCap(rawValue: defaults.string(forKey: "bridgeCap") ?? "") ?? .rounded
 
         soundEnabled = defaults.object(forKey: "soundEnabled") as? Bool ?? true
         hapticsEnabled = defaults.object(forKey: "hapticsEnabled") as? Bool ?? true

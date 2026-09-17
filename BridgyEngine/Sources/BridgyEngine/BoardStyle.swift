@@ -72,3 +72,39 @@ public enum BoardStyle: String, CaseIterable, Identifiable, Codable, Sendable {
     /// Shared images look better on their own ground than on the system's.
     public var prefersDarkGround: Bool { self == .neon }
 }
+
+/// How a bridge ends.
+///
+/// Independent of `BoardStyle`, because it is a matter of taste rather than of
+/// what the drawing shows: every style reads correctly either way.
+public enum BridgeCap: String, CaseIterable, Identifiable, Codable, Sendable {
+    case rounded
+    case square
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .rounded: return "Rounded"
+        case .square: return "Square"
+        }
+    }
+
+    /// `.square` rather than `.butt`: both end flat, but `.butt` stops dead at
+    /// the dot, which leaves a notch on the outside of every corner once the
+    /// stroke is wide. `.square` carries the flat end half a width further and
+    /// fills it.
+    public var lineCap: CGLineCap {
+        switch self {
+        case .rounded: return .round
+        case .square: return .square
+        }
+    }
+
+    public var lineJoin: CGLineJoin {
+        switch self {
+        case .rounded: return .round
+        case .square: return .miter
+        }
+    }
+}

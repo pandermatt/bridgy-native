@@ -63,6 +63,16 @@ final class AppModel {
         return session
     }
 
+    /// Leaving Play: park the live game. The tab comes back to setup, and the
+    /// game is offered there as Continue rather than resuming mid-move under
+    /// someone who went to look at Settings.
+    func parkSession() {
+        guard let session else { return }
+        session.suspend()
+        self.session = nil
+        resumable = store.load()
+    }
+
     func refreshResumable() {
         guard session == nil else { return }
         resumable = store.load()
