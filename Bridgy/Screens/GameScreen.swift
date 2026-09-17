@@ -16,7 +16,7 @@ struct GameScreen: View {
             .padding(.top, 8)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             .navigationTitle(session.statusText)
-            .navigationSubtitle(subtitle)
+            .platformSubtitle(subtitle)
             .toolbar { actions(settings: $settings) }
             .gameScreenTitleDisplayMode()
             .modifier(GameFeedback(session: session, settings: model.settings, isWatching: isWatching))

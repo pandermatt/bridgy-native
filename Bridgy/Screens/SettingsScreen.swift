@@ -84,7 +84,12 @@ struct SettingsScreen: View {
 
             Section("Feedback") {
                 Toggle("Sound", isOn: $settings.soundEnabled)
+                // Vision Pro has no haptic engine, so `.sensoryFeedback`
+                // compiles and does nothing. A switch that cannot do anything is
+                // worse than no switch.
+                #if !os(visionOS)
                 Toggle("Haptics", isOn: $settings.hapticsEnabled)
+                #endif
             }
 
             Section("Watching two computers") {

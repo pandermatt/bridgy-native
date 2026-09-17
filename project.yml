@@ -6,6 +6,7 @@ options:
   deploymentTarget:
     iOS: "26.0"
     macOS: "26.0"
+    visionOS: "26.0"
   minimumXcodeGenVersion: "2.46.0"
 
 packages:
@@ -16,7 +17,7 @@ targets:
   Bridgy:
     type: application
     platform: auto
-    supportedDestinations: [iOS, macOS]
+    supportedDestinations: [iOS, macOS, visionOS]
     sources:
       - path: Bridgy
         type: syncedFolder
@@ -36,11 +37,19 @@ targets:
         DEVELOPMENT_TEAM: ""
         CODE_SIGN_STYLE: Automatic
         INFOPLIST_KEY_CFBundleDisplayName: Bridgy
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.board-games
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
-        ENABLE_HARDENED_RUNTIME: YES
-
+        # SDK conditions belong on the setting key. As a sibling of `base:`,
+        # XcodeGen reads `[sdk=...]` as a build-configuration name and silently
+        # drops the whole block.
+        #
+        # Orientation and launch screens mean nothing on visionOS; the hardened
+        # runtime is macOS-only. And the multiplatform target otherwise inherits
+        # an "iPhone Developer" identity that macOS cannot satisfy without a
+        # team, so macOS signs ad-hoc, which is what a local build wants.
+        INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphone*]: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations[sdk=iphone*]: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad[sdk=iphone*]: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        ENABLE_HARDENED_RUNTIME[sdk=macosx*]: YES
+        CODE_SIGN_IDENTITY[sdk=macosx*]: "-"

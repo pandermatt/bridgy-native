@@ -84,7 +84,7 @@ struct SetupScreen: View {
                     // to one. Painting the gradient and putting clear glass over
                     // it keeps the material's press behaviour and the colour both.
                     .background(startGradient, in: .capsule)
-                    .glassEffect(.clear.interactive(), in: .capsule)
+                    .interactiveGlass(in: .capsule)
                     // All of this has to live inside the label. `.plain` hit-tests
                     // the label's drawn content, and a Label is glyphs with
                     // transparent space around them — decorating the Button from

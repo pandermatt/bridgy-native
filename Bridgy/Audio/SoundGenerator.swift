@@ -35,7 +35,9 @@ final class SoundGenerator {
     func prepare() {
         guard !started else { return }
         started = true
-        #if os(iOS)
+        // visionOS needs this as much as iOS does: without `.ambient` and
+        // `.mixWithOthers` the game's tones duck whatever the wearer is playing.
+        #if os(iOS) || os(visionOS)
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
         #endif

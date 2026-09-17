@@ -66,7 +66,7 @@ struct ResultSheet: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .navigationSubtitle(subtitle)
+            .platformSubtitle(subtitle)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
@@ -157,7 +157,7 @@ struct ResultSheet: View {
                     Label("Share Image", systemImage: "square.and.arrow.up")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.glassProminent)
+                .prominentAction()
                 .controlSize(.large)
             }
             Button {
@@ -167,7 +167,7 @@ struct ResultSheet: View {
                 Label("Play Again", systemImage: "arrow.clockwise")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.glass)
+            .secondaryAction()
             .controlSize(.large)
 
             Button {
@@ -177,7 +177,7 @@ struct ResultSheet: View {
                 Label("Change Setup", systemImage: "slider.horizontal.3")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.glass)
+            .secondaryAction()
             .controlSize(.large)
         }
     }
@@ -254,14 +254,20 @@ struct ShareableBoard: View {
 
 extension ImageRenderer {
     /// PNG bytes, on whichever platform we are.
+    ///
+    /// Tested for macOS rather than iOS on purpose: visionOS is neither
+    /// `os(iOS)` nor `os(macOS)`, so an `#if os(iOS)` here sent it down the
+    /// AppKit branch and it failed to find `NSBitmapImageRep`. `uiImage` is
+    /// available on visionOS, so the negative test is the one that holds for
+    /// all three.
     @MainActor
     var pngData: Data? {
-        #if os(iOS)
-        return uiImage?.pngData()
-        #else
+        #if os(macOS)
         guard let cgImage else { return nil }
         let representation = NSBitmapImageRep(cgImage: cgImage)
         return representation.representation(using: .png, properties: [:])
+        #else
+        return uiImage?.pngData()
         #endif
     }
 }

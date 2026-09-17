@@ -29,7 +29,7 @@ struct BridgyApp: App {
                     .disabled(model.session?.isHumanTurn != true)
             }
         }
-        #if os(macOS)
+        #if os(macOS) || os(visionOS)
         .defaultSize(width: 980, height: 760)
         .windowResizability(.contentMinSize)
         #endif

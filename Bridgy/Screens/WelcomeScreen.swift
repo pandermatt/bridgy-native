@@ -57,7 +57,7 @@ struct WelcomeScreen: View {
                 Text("Continue")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.glassProminent)
+            .prominentAction()
             .controlSize(.large)
             .padding(24)
             .frame(maxWidth: 520)

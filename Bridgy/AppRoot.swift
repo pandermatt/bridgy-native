@@ -93,10 +93,12 @@ struct PlayTab: View {
 
 
 private extension View {
-    /// A full-screen cover on iOS, a sheet on macOS, which has no such thing.
+    /// A full-screen cover where there is one, a sheet on macOS, which has no
+    /// such thing. visionOS has to be named explicitly — it is not `os(iOS)`,
+    /// so it was taking the macOS branch along with its hardcoded sizing.
     @ViewBuilder
     func welcomeCover(isPresented: Binding<Bool>, onContinue: @escaping () -> Void) -> some View {
-        #if os(iOS)
+        #if os(iOS) || os(visionOS)
         fullScreenCover(isPresented: isPresented) {
             WelcomeScreen(onContinue: onContinue)
         }
