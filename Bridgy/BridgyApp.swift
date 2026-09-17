@@ -38,7 +38,7 @@ struct BridgyApp: App {
         #if os(visionOS)
         ImmersiveSpace(id: BridgyApp.tableSpace) {
             ImmersiveBoardView(
-                board: Board(size: model.configuration.size),
+                configuration: model.configuration,
                 theme: model.settings.theme,
                 style: model.settings.boardStyle
             )

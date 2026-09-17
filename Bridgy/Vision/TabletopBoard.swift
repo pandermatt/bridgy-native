@@ -63,6 +63,19 @@ struct BoardMetrics {
         plane(geometry.center(of: board.move(at: cell)))
     }
 
+    /// The same place, as TabletopKit understands position.
+    ///
+    /// Equipment is placed from its state's pose, not from the entity's
+    /// transform — set the transform and TabletopKit overrides it, which is how
+    /// every bridge ended up stacked at the middle of the table.
+    func cellPose(_ cell: Int) -> TableVisualState.Pose2D {
+        let point = geometry.center(of: board.move(at: cell))
+        return .init(
+            position: .init(x: Double(point.x) - side / 2, z: Double(point.y) - side / 2),
+            rotation: .zero
+        )
+    }
+
     func dotCentre(_ dot: BoardGeometry.Dot) -> SIMD3<Float> {
         plane(geometry.point(of: dot))
     }
@@ -87,13 +100,45 @@ struct BoardMetrics {
 // MARK: - Equipment
 
 /// One contested cell. It never moves: a bridge is claimed, not carried.
-@MainActor
 struct BridgeSlot: EntityEquipment {
     let id: EquipmentIdentifier
     let entity: Entity
     let initialState: BaseEquipmentState
     /// Index into `GameState.cells`, which is what the engine speaks.
     let cell: Int
+    /// Whether Down's bridge across this gap runs away from the player. Across's
+    /// is always the perpendicular one, so a single flag covers both.
+    let blueRunsAlongZ: Bool
+
+    /// A bridge dropped here settles centred on the gap and square to it.
+    ///
+    /// Every bridge is modelled pointing the same way, so the turn happens here:
+    /// a piece belonging to the side that crosses this gap the other way is
+    /// rotated a quarter turn as it lands.
+    func layoutChildren(
+        for snapshot: TableSnapshot,
+        visualState: TableVisualState
+    ) -> any EquipmentLayout {
+        let children = snapshot.equipment(of: BridgePiece.self, childrenOf: id)
+        return .planarStacked(
+            layout: children.map { piece, _ in
+                let alongZ = piece.owner == .blue ? blueRunsAlongZ : !blueRunsAlongZ
+                return EquipmentPose2D(
+                    id: piece.id,
+                    pose: .init(position: .zero, rotation: alongZ ? .zero : .degrees(90))
+                )
+            },
+            animationDuration: 0.25
+        )
+    }
+}
+
+/// A bridge waiting in a player's tray, to be carried out onto the water.
+struct BridgePiece: EntityEquipment {
+    let id: EquipmentIdentifier
+    let entity: Entity
+    let initialState: BaseEquipmentState
+    let owner: BoardSide
 }
 
 struct BridgyTabletop: EntityTabletop {
@@ -111,7 +156,6 @@ struct BridgyTabletop: EntityTabletop {
     }
 }
 
-@MainActor
 struct BridgySeat: EntityTableSeat {
     let id: TableSeatIdentifier
     let entity: Entity
@@ -170,13 +214,43 @@ struct TabletopBoardBuilder {
                 initialState: BaseEquipmentState(
                     parentID: tabletop.id,
                     seatControl: .any,
-                    pose: .identity,
+                    pose: metrics.cellPose(cell),
                     entity: entity
                 ),
-                cell: cell
+                cell: cell,
+                blueRunsAlongZ: metrics.runsAlongZ(cell: cell, player: .blue)
             )
             slots.append(slot)
             setup.add(equipment: slot)
+        }
+
+        // Every piece has to exist now: TabletopKit fixes equipment at
+        // TableSetup, so there is no dealing another bridge later. Each side
+        // gets exactly as many as it could ever play.
+        var pieces: [BridgePiece] = []
+        var nextID = board.cellCount + 1
+        for side in BoardSide.allCases {
+            let total = side == .blue
+                ? (board.cellCount + 1) / 2
+                : board.cellCount / 2
+            for index in 0..<total {
+                let entity = bridgeModel(metrics: metrics, player: side)
+                surface.addChild(entity)
+                let piece = BridgePiece(
+                    id: EquipmentIdentifier(nextID),
+                    entity: entity,
+                    initialState: BaseEquipmentState(
+                        parentID: tabletop.id,
+                        seatControl: .any,
+                        pose: trayPose(metrics: metrics, side: side, index: index),
+                        entity: entity
+                    ),
+                    owner: side
+                )
+                pieces.append(piece)
+                setup.add(equipment: piece)
+                nextID += 1
+            }
         }
 
         return TabletopBoard(
@@ -184,6 +258,7 @@ struct TabletopBoardBuilder {
             game: TabletopGame(tableSetup: setup),
             metrics: metrics,
             slots: slots,
+            pieces: pieces,
             seats: seats,
             theme: theme,
             style: style
@@ -353,84 +428,33 @@ struct TabletopBoardBuilder {
         ]
     }
 
-    private func seatEntity(at position: SIMD3<Float>) -> Entity {
-        let entity = Entity()
-        entity.position = position
-        return entity
-    }
-}
-
-/// Everything the immersive scene needs to show and drive one board.
-@MainActor
-final class TabletopBoard {
-    let root: Entity
-    let game: TabletopGame
-    let metrics: BoardMetrics
-    let slots: [BridgeSlot]
-    let seats: [BridgySeat]
-    let theme: BoardTheme
-    let style: BoardStyle
-
-    /// The bridge model currently standing in each slot, so a redraw only
-    /// touches cells that changed.
-    private var bridges: [Int: Entity] = [:]
-
-    init(
-        root: Entity,
-        game: TabletopGame,
+    /// Where a spare bridge waits: stacked in a neat pile on its own shore.
+    ///
+    /// A side can play upwards of thirty bridges on a small board, and laid out
+    /// side by side that is a field of them swamping the room. Fanned into a
+    /// shallow pile they read as a supply you take the top one from, and take up
+    /// about the space of one bridge.
+    private func trayPose(
         metrics: BoardMetrics,
-        slots: [BridgeSlot],
-        seats: [BridgySeat],
-        theme: BoardTheme,
-        style: BoardStyle
-    ) {
-        self.root = root
-        self.game = game
-        self.metrics = metrics
-        self.slots = slots
-        self.seats = seats
-        self.theme = theme
-        self.style = style
+        side: BoardSide,
+        index: Int
+    ) -> TableVisualState.Pose2D {
+        let fan = metrics.unit * 0.09 * Double(index)
+        let outward = metrics.side / 2 + metrics.unit * 1.9
+
+        let position: TableVisualState.Point2D = side == .blue
+            ? .init(x: fan - metrics.unit, z: outward)
+            : .init(x: -outward, z: fan - metrics.unit)
+        return .init(position: position, rotation: side == .blue ? .zero : .degrees(90))
     }
 
-    /// Adds, removes and recolours bridges so the table matches `state`.
-    func show(_ state: GameState) {
-        for slot in slots {
-            let owner = state.cells[slot.cell]
-            let existing = bridges[slot.cell]
-
-            switch (owner, existing) {
-            case (nil, let entity?):
-                entity.removeFromParent()
-                bridges[slot.cell] = nil
-            case (let owner?, nil):
-                let bridge = bridgeEntity(cell: slot.cell, player: owner)
-                slot.entity.addChild(bridge)
-                bridges[slot.cell] = bridge
-            case (let owner?, let entity?):
-                // An undo can hand the same cell to the other player.
-                entity.removeFromParent()
-                let bridge = bridgeEntity(cell: slot.cell, player: owner)
-                slot.entity.addChild(bridge)
-                bridges[slot.cell] = bridge
-            case (nil, nil):
-                break
-            }
-        }
-    }
-
-    func clear() {
-        for (_, entity) in bridges { entity.removeFromParent() }
-        bridges.removeAll()
-    }
-
-    /// A bridge rather than a bar: a deck with a rail down each side, lifted
-    /// clear of the water and spanning between two of that player's posts.
-    private func bridgeEntity(cell: Int, player: BoardSide) -> Entity {
+    /// A bridge: a deck with a rail down each side, modelled pointing away from
+    /// the player. The gap it lands on turns it if that crossing runs the other
+    /// way.
+    private func bridgeModel(metrics: BoardMetrics, player: BoardSide) -> Entity {
         let deckWidth = Float(metrics.bridgeThickness(style))
         let length = Float(metrics.bridgeLength)
         let deckHeight = deckWidth * 0.34
-        let alongZ = metrics.runsAlongZ(cell: cell, player: player)
 
         let colour = theme.materialColor(for: player)
         var deckMaterial = PhysicallyBasedMaterial()
@@ -442,40 +466,84 @@ final class TabletopBoard {
         railMaterial.roughness = 0.3
 
         let bridge = Entity()
-
-        let deck = ModelEntity(
-            mesh: .generateBox(
-                width: alongZ ? deckWidth : length,
-                height: deckHeight,
-                depth: alongZ ? length : deckWidth,
-                cornerRadius: deckHeight * 0.4
-            ),
-            materials: [deckMaterial]
+        bridge.addChild(
+            ModelEntity(
+                mesh: .generateBox(
+                    width: deckWidth,
+                    height: deckHeight,
+                    depth: length,
+                    cornerRadius: deckHeight * 0.4
+                ),
+                materials: [deckMaterial]
+            )
         )
-        bridge.addChild(deck)
 
         let railThickness = deckWidth * 0.16
-        let railHeight = deckWidth * 0.42
+        let railHeight = deckWidth * 0.28
         for sign in [Float(-1), Float(1)] {
             let rail = ModelEntity(
                 mesh: .generateBox(
-                    width: alongZ ? railThickness : length * 0.94,
+                    width: railThickness,
                     height: railHeight,
-                    depth: alongZ ? length * 0.94 : railThickness,
+                    depth: length * 0.94,
                     cornerRadius: railThickness * 0.5
                 ),
                 materials: [railMaterial]
             )
-            let offset = (deckWidth - railThickness) / 2 * sign
-            rail.position = alongZ
-                ? SIMD3(offset, deckHeight / 2 + railHeight / 2, 0)
-                : SIMD3(0, deckHeight / 2 + railHeight / 2, offset)
+            rail.position = SIMD3(
+                (deckWidth - railThickness) / 2 * sign,
+                deckHeight / 2 + railHeight / 2,
+                0
+            )
             bridge.addChild(rail)
         }
 
-        // Clear of the water, level with the tops of the posts it joins.
+        // Clear of the water, level with the post tops it will join.
         bridge.position = SIMD3(0, Float(metrics.unit * 0.62), 0)
         return bridge
+    }
+
+    private func seatEntity(at position: SIMD3<Float>) -> Entity {
+        let entity = Entity()
+        entity.position = position
+        return entity
+    }
+}
+
+/// Everything the immersive scene needs to run one table.
+///
+/// It no longer draws bridges. The pieces *are* the bridges: TabletopKit moves
+/// a piece entity from the tray onto a slot, so the board's job is just to hold
+/// the parts together.
+@MainActor
+final class TabletopBoard {
+    let root: Entity
+    let game: TabletopGame
+    let metrics: BoardMetrics
+    let slots: [BridgeSlot]
+    let pieces: [BridgePiece]
+    let seats: [BridgySeat]
+    let theme: BoardTheme
+    let style: BoardStyle
+
+    init(
+        root: Entity,
+        game: TabletopGame,
+        metrics: BoardMetrics,
+        slots: [BridgeSlot],
+        pieces: [BridgePiece],
+        seats: [BridgySeat],
+        theme: BoardTheme,
+        style: BoardStyle
+    ) {
+        self.root = root
+        self.game = game
+        self.metrics = metrics
+        self.slots = slots
+        self.pieces = pieces
+        self.seats = seats
+        self.theme = theme
+        self.style = style
     }
 }
 
