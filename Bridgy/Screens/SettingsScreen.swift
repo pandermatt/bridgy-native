@@ -1,4 +1,5 @@
 import BridgyEngine
+import MusicKit
 import SwiftUI
 
 struct SettingsScreen: View {
@@ -92,6 +93,8 @@ struct SettingsScreen: View {
                 #endif
             }
 
+            VictorySongSection(settings: settings)
+
             Section("Watching two computers") {
                 WatchPaceControls(pace: $settings.watchPace)
             }
@@ -158,5 +161,34 @@ struct SettingsScreen: View {
             }
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// The opt-in for a victory song. Asks for Apple Music access when turned on,
+/// and says plainly why it cannot work if the answer is no.
+private struct VictorySongSection: View {
+    @Bindable var settings: AppSettings
+    @State private var status = MusicAuthorization.currentStatus
+
+    var body: some View {
+        Section {
+            Toggle("Suggest a victory song", isOn: Binding(
+                get: { settings.suggestsVictorySong },
+                set: { on in
+                    settings.suggestsVictorySong = on
+                    guard on, status == .notDetermined else { return }
+                    Task { status = await MusicAuthorization.request() }
+                }
+            ))
+            if settings.suggestsVictorySong, status == .denied || status == .restricted {
+                Label("Apple Music access is off for Bridgy. Turn it on in Settings › Privacy › Media & Apple Music.", systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("After a win")
+        } footer: {
+            Text("Shows a song you can tap to hear a 10-second Apple Music preview. No subscription needed; nothing plays until you tap.")
+        }
     }
 }

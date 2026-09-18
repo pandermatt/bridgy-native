@@ -1,5 +1,6 @@
 import AppIntents
 import BridgyEngine
+import MusicKit
 import SwiftUI
 
 /// The board, on the system background, with everything else in system chrome.
@@ -70,6 +71,12 @@ struct GameScreen: View {
             if session.state.isOver, session.reviewIndex == nil {
                 gameOverBar
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+                if model.settings.suggestsVictorySong,
+                   let winner = session.state.winner,
+                   session.configuration.soloHumanPlayer == winner || session.configuration.isLocalTwoPlayer {
+                    EndGameView(songID: MusicItemID(model.settings.victorySongID))
+                        .transition(.opacity)
+                }
             } else {
                 if model.settings.showHints, !session.state.isOver {
                     hintLine

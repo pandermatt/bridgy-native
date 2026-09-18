@@ -9,6 +9,8 @@ final class AppModel {
 
     let settings = AppSettings()
     let sound = SoundGenerator()
+    /// Victory-song previews; one player for the whole app.
+    let audio = AudioEngine()
     let store = GameStore()
     let agents = AgentStore()
     /// Lives here rather than on its screen so training carries on while you

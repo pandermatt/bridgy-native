@@ -18,6 +18,11 @@ final class AppSettings {
     var hasSeenWelcome: Bool { didSet { store(hasSeenWelcome, "hasSeenWelcome") } }
     /// The "ask Siri for a move" tip under the board, until it is closed.
     var showsSiriHintTip: Bool { didSet { store(showsSiriHintTip, "showsSiriHintTip") } }
+    /// Offer a song with a short Apple Music preview after a win. Off until
+    /// asked for: it needs Apple Music access.
+    var suggestsVictorySong: Bool { didSet { store(suggestsVictorySong, "suggestsVictorySong") } }
+    /// Apple Music catalogue id of the song offered.
+    var victorySongID: String { didSet { store(victorySongID, "victorySongID") } }
 
     var watchPace: WatchPace {
         didSet {
@@ -57,6 +62,9 @@ final class AppSettings {
         highlightsWinningPath = defaults.object(forKey: "highlightsWinningPath") as? Bool ?? true
         hasSeenWelcome = defaults.object(forKey: "hasSeenWelcome") as? Bool ?? false
         showsSiriHintTip = defaults.object(forKey: "showsSiriHintTip") as? Bool ?? true
+        suggestsVictorySong = defaults.object(forKey: "suggestsVictorySong") as? Bool ?? false
+        // "Lemonade" by SOPHIE.
+        victorySongID = defaults.string(forKey: "victorySongID") ?? "1528287372"
         watchPace = WatchPace(
             movesPerSecond: defaults.object(forKey: "watchMovesPerSecond") as? Double
                 ?? WatchPace.default.movesPerSecond,
