@@ -65,6 +65,7 @@ final class PlayHistory {
         if games.count > Self.limit { games.removeLast(games.count - Self.limit) }
         persist()
         onChange?(.gameSaved(game.id))
+        GameCenter.gameFinished(game)
         return game
     }
 

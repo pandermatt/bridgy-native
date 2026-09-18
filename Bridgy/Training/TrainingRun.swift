@@ -197,6 +197,7 @@ final class TrainingRun {
             do {
                 try store.save(saved, weights: weights)
                 agent = saved
+                GameCenter.agentTrained()
             } catch {
                 self.error = "Couldn’t save: \(error.localizedDescription)"
             }

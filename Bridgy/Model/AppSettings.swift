@@ -29,7 +29,10 @@ final class AppSettings {
 
     func recordPuzzle(solved: Bool) {
         puzzlesTried += 1
-        if solved { puzzlesSolved += 1 }
+        if solved {
+            puzzlesSolved += 1
+            GameCenter.puzzlesChanged(solved: puzzlesSolved)
+        }
     }
 
     /// Apple Music catalogue id of the song offered.

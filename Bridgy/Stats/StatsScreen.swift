@@ -1,5 +1,6 @@
 import BridgyEngine
 import Charts
+import GameKit
 import SwiftUI
 
 /// How you play: overall, against each opponent, by board size, and the games
@@ -34,6 +35,15 @@ struct StatsScreen: View {
             }
         }
         .navigationTitle("Your Stats")
+        .toolbar {
+            if GameCenter.isSignedIn {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { GKAccessPoint.shared.trigger(state: .dashboard) {} } label: {
+                        Label("Game Center", systemImage: "gamecontroller")
+                    }
+                }
+            }
+        }
         .sheet(item: $replaying) { game in
             ReplayView(record: game.record, names: game.names)
         }

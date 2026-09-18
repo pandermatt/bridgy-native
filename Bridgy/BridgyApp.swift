@@ -22,6 +22,7 @@ struct BridgyApp: App {
                 .task {
                     model.prepareAudio()
                     model.updateSync()
+                    GameCenter.authenticate()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { model.cloud.syncNow() }
