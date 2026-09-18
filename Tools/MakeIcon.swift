@@ -9,7 +9,12 @@ import UniformTypeIdentifiers
 let blue = CGColor(red: 0.427, green: 0.682, blue: 0.922, alpha: 1)
 let red = CGColor(red: 1.0, green: 0.22, blue: 0.29, alpha: 1)
 
-func render(size: CGFloat, rounded: Bool, to url: URL) {
+/// iOS draws a home screen in three appearances. Dark icons leave the plate
+/// transparent so the system's own dark backdrop shows; tinted icons are
+/// grayscale, which the system colours with the person's tint.
+enum Appearance { case standard, dark, tinted }
+
+func render(size: CGFloat, rounded: Bool, appearance: Appearance = .standard, to url: URL) {
     let space = CGColorSpaceCreateDeviceRGB()
     guard let context = CGContext(
         data: nil, width: Int(size), height: Int(size), bitsPerComponent: 8,
@@ -30,6 +35,14 @@ func render(size: CGFloat, rounded: Bool, to url: URL) {
     }
 
     // Deep navy backdrop, so the two chains carry the colour.
+    let blue = appearance == .tinted ? CGColor(gray: 1, alpha: 1)
+        : appearance == .dark ? CGColor(red: 0.52, green: 0.76, blue: 1.0, alpha: 1) : blue
+    let red = appearance == .tinted ? CGColor(gray: 0.6, alpha: 1)
+        : appearance == .dark ? CGColor(red: 1.0, green: 0.36, blue: 0.42, alpha: 1) : red
+    if appearance == .tinted {
+        context.setFillColor(CGColor(gray: 0, alpha: 1))
+        context.fill(plate)
+    }
     let gradient = CGGradient(
         colorsSpace: space,
         colors: [
@@ -38,12 +51,12 @@ func render(size: CGFloat, rounded: Bool, to url: URL) {
         ] as CFArray,
         locations: [0, 1]
     )!
-    context.drawLinearGradient(
+    if appearance == .standard { context.drawLinearGradient(
         gradient,
         start: CGPoint(x: plate.minX, y: plate.maxY),
         end: CGPoint(x: plate.maxX, y: plate.minY),
         options: []
-    )
+    ) }
 
     let unit = plate.width
     func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
@@ -90,6 +103,8 @@ let outputDirectory = URL(fileURLWithPath: CommandLine.arguments[1])
 try? FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 
 render(size: 1024, rounded: false, to: outputDirectory.appendingPathComponent("icon-ios-1024.png"))
+render(size: 1024, rounded: false, appearance: .dark, to: outputDirectory.appendingPathComponent("icon-ios-1024-dark.png"))
+render(size: 1024, rounded: false, appearance: .tinted, to: outputDirectory.appendingPathComponent("icon-ios-1024-tinted.png"))
 for size in [16, 32, 64, 128, 256, 512, 1024] {
     render(size: CGFloat(size), rounded: true, to: outputDirectory.appendingPathComponent("icon-mac-\(size).png"))
 }
