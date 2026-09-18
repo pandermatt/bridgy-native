@@ -36,9 +36,20 @@ struct AppRoot: View {
             boardSide = Self.boardSide(in: size, sidebar: usesSidebar)
         }
         .environment(\.availableBoardSide, boardSide)
+        // A .bridgyagent opened from Files, Finder, Mail or AirDrop.
+        .onOpenURL { url in
+            guard url.pathExtension == "bridgyagent" else { return }
+            if (try? model.agents.importAgent(from: url)) != nil {
+                tabSelection.wrappedValue = usesSidebar ? .agents : .lab
+            }
+        }
         .onChange(of: model.requestedTab) { _, requested in
             guard let requested else { return }
-            tabSelection.wrappedValue = requested
+            // Straight to the tab, not through `tabSelection`: that parks the
+            // game on any switch to Play, and a request for Play usually comes
+            // with a game just started for it.
+            if tab == .play, requested != .play { model.parkSession() }
+            tab = requested
             model.requestedTab = nil
         }
         .welcomeCover(isPresented: $showingWelcome) {

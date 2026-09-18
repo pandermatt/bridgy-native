@@ -70,7 +70,13 @@ final class BridgyRules {
     /// Read by the interaction delegate, which has no actor to read from.
     @ObservationIgnored let gaps = PlayableGaps()
 
-    init(board: Board, seats: [BoardSide: Seat], slots: [BridgeSlot], pieces: [BridgePiece]) {
+    init(
+        board: Board,
+        seats: [BoardSide: Seat],
+        slots: [BridgeSlot],
+        pieces: [BridgePiece],
+        agentEngine: (UUID) -> (any Engine)? = { _ in nil }
+    ) {
         self.state = GameState(board: board)
         self.seats = seats
         self.slotIDByCell = Dictionary(uniqueKeysWithValues: slots.map { ($0.cell, $0.id) })
@@ -81,8 +87,13 @@ final class BridgyRules {
         self.dealt = piles
 
         for side in BoardSide.allCases {
-            if case .computer(let level) = seats[side] {
+            switch seats[side] {
+            case .computer(let level)?:
                 engines[side] = level.engine(forSize: board.size)
+            case .agent(let id, _)?:
+                engines[side] = agentEngine(id) ?? Difficulty.medium.engine(forSize: board.size)
+            default:
+                break
             }
         }
     }

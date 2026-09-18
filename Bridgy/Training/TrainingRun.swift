@@ -50,6 +50,12 @@ final class TrainingRun {
 
     private var task: Task<Void, Never>?
     private var control = TrainingControl()
+    /// The Live Activity; dismissing it, or its Stop button, stops training.
+    @ObservationIgnored private lazy var live = RunActivityController(kind: .training) { [weak self] in
+        self?.stop()
+    }
+    /// Latest benchmark against Hard, for the Live Activity's detail line.
+    private var lastHard: Double?
     /// Steps are averaged in groups so a long run plots a few hundred points,
     /// not tens of thousands.
     private var pending: (policy: Double, value: Double, count: Int) = (0, 0, 0)
@@ -98,6 +104,8 @@ final class TrainingRun {
         let parameters = parameters
         let control = control
         let seed = UInt64.random(in: 1...UInt64.max)
+        lastHard = nil
+        live.start(title: "Training \(name)", headline: "Starting…")
         task = Task { [weak self] in
             for await event in Training.run(parameters: parameters, from: start, seed: seed, control: control) {
                 guard let self else { return }
@@ -111,6 +119,7 @@ final class TrainingRun {
                     ? "Finished, but no network beat the one it started with."
                     : "Finished. \(self.agent?.name ?? "The agent") is saved and can enter the tournament."
             }
+            self.live.end(finalHeadline: self.status, detail: self.liveDetail)
         }
     }
 
@@ -127,12 +136,21 @@ final class TrainingRun {
         task = nil
         if isRunning {
             status = agent == nil ? "Stopped." : "Stopped. The best network so far is saved."
+            live.end(finalHeadline: nil)
         }
         isRunning = false
         isPaused = false
     }
 
+    private var liveDetail: String {
+        lastHard.map { "vs Hard \(Int(($0 * 100).rounded()))%" } ?? ""
+    }
+
     private func handle(_ event: TrainingEvent, store: AgentStore) {
+        defer {
+            let done = Double(max(round - 1, 0)) / Double(max(roundsPlanned, 1))
+            live.update(progress: done, headline: status, detail: liveDetail)
+        }
         switch event {
         case .selfPlay(let round, let finished, let total):
             self.round = round
@@ -157,6 +175,7 @@ final class TrainingRun {
 
         case .benchmark(let round, let opponent, let score):
             benchmarks.append(ScorePoint(round: roundOffset + round, series: opponent, score: score))
+            if opponent == Difficulty.hard.displayName { lastHard = score }
             // These always measure the best network so far, which is the one saved.
             if var agent {
                 agent.benchmarks[opponent] = score

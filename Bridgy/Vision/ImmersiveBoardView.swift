@@ -19,7 +19,12 @@ struct ImmersiveBoardView: View {
     @State private var grabOffset: SIMD3<Float>?
     private let theme: BoardTheme
 
-    init(configuration: GameConfiguration, theme: BoardTheme, style: BoardStyle) {
+    init(
+        configuration: GameConfiguration,
+        theme: BoardTheme,
+        style: BoardStyle,
+        agentEngine: (UUID) -> (any Engine)? = { _ in nil }
+    ) {
         let board = Board(size: configuration.size)
         let table = TabletopBoardBuilder(board: board, theme: theme, style: style).build()
         self.theme = theme
@@ -29,7 +34,8 @@ struct ImmersiveBoardView: View {
                 board: board,
                 seats: [.blue: configuration.blue, .red: configuration.red],
                 slots: table.slots,
-                pieces: table.pieces
+                pieces: table.pieces,
+                agentEngine: agentEngine
             )
         )
     }

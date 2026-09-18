@@ -6,7 +6,8 @@ let package = Package(
     platforms: [.iOS(.v26), .macOS(.v26), .visionOS(.v26)],
     products: [
         .library(name: "BridgyEngine", targets: ["BridgyEngine"]),
-        .library(name: "BridgyTraining", targets: ["BridgyTraining"])
+        .library(name: "BridgyTraining", targets: ["BridgyTraining"]),
+        .library(name: "BridgyLive", targets: ["BridgyLive"])
     ],
     targets: [
         .target(
@@ -34,6 +35,12 @@ let package = Package(
                 .swiftLanguageMode(.v6),
                 .unsafeFlags(["-O"], .when(configuration: .debug))
             ]
+        ),
+        // The Live Activity's attributes and Stop intent, shared by the app and
+        // its widget extension so both see the very same types.
+        .target(
+            name: "BridgyLive",
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
             name: "BridgyEngineTests",

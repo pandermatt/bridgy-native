@@ -171,6 +171,12 @@ struct SetupScreen: View {
                         ForEach(Difficulty.allCases) { level in
                             Text(level.displayName).tag(Seat.computer(level))
                         }
+                        if !model.agents.agents.isEmpty {
+                            Divider()
+                            ForEach(model.agents.agents) { agent in
+                                Label(agent.name, systemImage: "brain").tag(Seat.agent(agent.id, name: agent.name))
+                            }
+                        }
                     }
                     .pickerStyle(.inline)
                     .labelsHidden()
@@ -185,6 +191,12 @@ struct SetupScreen: View {
                 }
             }
 
+            if case .agent(let id, _) = binding(for: player).wrappedValue,
+               let agent = model.agents.agents.first(where: { $0.id == id }) {
+                Text("Your trained agent: \(agent.summary), searching \(agent.parameters.simulations) positions a move.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
             if let level = binding(for: player).wrappedValue.difficulty {
                 Text(level.summary)
                     .font(.footnote)

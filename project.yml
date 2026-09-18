@@ -22,10 +22,14 @@ targets:
       - path: Bridgy
         type: syncedFolder
     dependencies:
+      - target: BridgyWidgets
+        destinationFilters: [iOS]
       - package: BridgyEngine
         product: BridgyEngine
       - package: BridgyEngine
         product: BridgyTraining
+      - package: BridgyEngine
+        product: BridgyLive
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ch.pandermatt.bridgy
@@ -60,4 +64,41 @@ targets:
         # visionOS gets a real plist, merged with the generated keys. Scoped by
         # SDK so iPad multi-window behaviour is left alone.
         INFOPLIST_FILE[sdk=xr*]: Support/VisionInfo.plist
+        # Agent files (.bridgyagent) on iPhone, iPad and Mac.
+        INFOPLIST_FILE[sdk=iphone*]: Support/AppInfo.plist
+        INFOPLIST_FILE[sdk=macosx*]: Support/AppInfo.plist
+        INFOPLIST_KEY_NSSupportsLiveActivities[sdk=iphone*]: YES
+        # Opened agent files are copied in, not edited where they lie. macOS
+        # refuses NO here, so it is set for iPhone and iPad only.
+        INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace[sdk=iphone*]: NO
+        INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace[sdk=macosx*]: YES
         CODE_SIGN_IDENTITY[sdk=macosx*]: "-"
+
+  # Live Activities for training and experiments. iPhone and iPad only.
+  BridgyWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: BridgyWidgets
+    dependencies:
+      - package: BridgyEngine
+        product: BridgyLive
+    info:
+      path: BridgyWidgets/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ch.pandermatt.bridgy.widgets
+        PRODUCT_NAME: BridgyWidgets
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Bridgy
+        DEVELOPMENT_TEAM: 692NM4E836
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1,2"

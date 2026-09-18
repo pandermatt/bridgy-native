@@ -62,6 +62,9 @@ final class GameSession {
         let budgetMilliseconds: Int
     }
     private var engineCache: [EngineKey: any Engine] = [:]
+    /// Builds the engine for a trained agent; nil if it no longer exists.
+    private let agentEngine: @MainActor (UUID) -> (any Engine)?
+    private var agentCache: [UUID: any Engine] = [:]
 
     /// Timestamps of recent moves, for reporting the rate actually achieved.
     private var recentMoves: [ContinuousClock.Instant] = []
@@ -71,8 +74,10 @@ final class GameSession {
         settings: AppSettings,
         sound: SoundGenerator,
         store: GameStore = GameStore(),
-        state: GameState? = nil
+        state: GameState? = nil,
+        agentEngine: @escaping @MainActor (UUID) -> (any Engine)? = { _ in nil }
     ) {
+        self.agentEngine = agentEngine
         self.configuration = configuration
         self.settings = settings
         self.sound = sound
@@ -270,22 +275,21 @@ final class GameSession {
     private func advance() {
         cancelThinking()
         guard !state.isOver else { return }
-        guard case .computer(let level) = configuration.seat(for: state.current) else { return }
+        let seat = configuration.seat(for: state.current)
+        guard seat.isComputer else { return }
         guard !configuration.isWatchOnly || !isPaused else { return }
 
         let watching = configuration.isWatchOnly
         let budget = pace?.thinkingBudget
 
-        if watching, pace?.isInstant == true,
-           case .computer(let blueLevel) = configuration.blue,
-           case .computer(let redLevel) = configuration.red {
+        if watching, pace?.isInstant == true {
             playInstantly(
-                blue: engine(for: blueLevel, budget: budget),
-                red: engine(for: redLevel, budget: budget)
+                blue: engine(for: configuration.blue, budget: budget),
+                red: engine(for: configuration.red, budget: budget)
             )
             return
         }
-        let engine = engine(for: level, budget: budget)
+        let engine = engine(for: seat, budget: budget)
         let snapshot = state
         // A beat before a computer move, so its reply does not land in the same
         // instant as the tap that caused it. When watching, the beat is the pace.
@@ -380,6 +384,21 @@ final class GameSession {
     /// Engines are reused across turns. It matters: `PerfectEngine` carries its
     /// pairing strategy internally, and rebuilding it would throw that away and
     /// force a full spanning-tree pack on the next move.
+    private func engine(for seat: Seat, budget: Duration?) -> any Engine {
+        switch seat {
+        case .computer(let level):
+            return engine(for: level, budget: budget)
+        case .agent(let id, _):
+            if let cached = agentCache[id] { return cached }
+            // A deleted agent's seat falls back to Medium rather than stalling.
+            let made = agentEngine(id) ?? engine(for: .medium, budget: budget)
+            agentCache[id] = made
+            return made
+        case .human:
+            return engine(for: .medium, budget: budget)
+        }
+    }
+
     private func engine(for level: Difficulty, budget: Duration?) -> any Engine {
         let key = EngineKey(
             difficulty: level,

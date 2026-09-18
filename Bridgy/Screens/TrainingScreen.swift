@@ -9,6 +9,8 @@ struct TrainingScreen: View {
     @Bindable var run: TrainingRun
     @State private var renaming: SavedAgent?
     @State private var newName = ""
+    @State private var importing = false
+    @State private var importError: String?
 
     private var p: Binding<TrainingParameters> { $run.parameters }
 
@@ -17,10 +19,28 @@ struct TrainingScreen: View {
             controlSection
             if !run.benchmarks.isEmpty || !run.gates.isEmpty { strengthSection }
             if !run.losses.isEmpty { lossSection }
-            setupSections.disabled(run.isRunning)
+            // While it trains there is nothing to set: the settings are fixed
+            // for the run, and a screen of dead controls only gets in the way.
+            if !run.isRunning { setupSections }
             agentsSection
         }
         .formStyle(.grouped)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { importing = true } label: {
+                    Label("Import Agent…", systemImage: "square.and.arrow.down")
+                }
+            }
+        }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.bridgyAgent], allowsMultipleSelection: true) { result in
+            guard case .success(let urls) = result else { return }
+            do {
+                for url in urls { try model.agents.importAgent(from: url) }
+                importError = nil
+            } catch {
+                importError = error.localizedDescription
+            }
+        }
         .navigationTitle("Train an Agent")
         .alert("Rename Agent", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $newName)
@@ -37,6 +57,10 @@ struct TrainingScreen: View {
     private var controlSection: some View {
         Section {
             if run.isRunning {
+                LabeledContent(run.name) {
+                    Text("\(run.parameters.boardSize)×\(run.parameters.boardSize) · \(run.parameters.channels)×\(run.parameters.blocks) · \(run.parameters.simulations) sims")
+                        .monospacedDigit()
+                }
                 VStack(alignment: .leading, spacing: 6) {
                     ProgressView(value: Double(max(run.round - 1, 0)), total: Double(max(run.roundsPlanned, 1)))
                     Text(run.status)
@@ -199,20 +223,27 @@ struct TrainingScreen: View {
                     .foregroundStyle(.secondary)
             }
             ForEach(model.agents.agents) { agent in
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(agent.name).font(.headline)
-                    Text(agent.summary).font(.footnote).foregroundStyle(.secondary)
-                    if !agent.benchmarks.isEmpty {
-                        Text(benchmarkLine(agent)).font(.footnote.monospacedDigit()).foregroundStyle(.secondary)
+                NavigationLink {
+                    AgentDetailView(agentID: agent.id, run: run)
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(agent.name).font(.headline)
+                        Text(agent.summary).font(.footnote).foregroundStyle(.secondary)
+                        if !agent.benchmarks.isEmpty {
+                            Text(benchmarkLine(agent)).font(.footnote.monospacedDigit()).foregroundStyle(.secondary)
+                        }
                     }
                 }
                 .contextMenu { actions(for: agent) }
                 .swipeActions { actions(for: agent) }
             }
+            if let importError {
+                Label(importError, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.red)
+            }
         } header: {
             Text("Saved agents")
         } footer: {
-            Text("Saved agents can enter the tournament. Continue training picks up from an agent's network with the settings above; its board size and network stay as they were.")
+            Text("Open an agent to play it, share it, export it to Files or train it further. Agents shared with you come in with Import, or by opening the .bridgyagent file.")
         }
     }
 

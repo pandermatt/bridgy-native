@@ -8,6 +8,9 @@ struct GamesView: View {
     @State private var selection: GameRecord.ID?
     @State private var order = [KeyPathComparator(\Row.index)]
     @State private var replaying: GameRecord?
+    /// On iPhone: longest games first, five at a time.
+    @State private var longestFirst = true
+    @State private var showsAll = false
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
     #endif
@@ -44,22 +47,54 @@ struct GamesView: View {
             if analysis.games.isEmpty {
                 ContentUnavailableView("No games yet", systemImage: "square.grid.3x3", description: Text("Games appear here as they finish."))
             } else if compact {
-                List(rows) { row in
-                    Button { replaying = row.record } label: {
-                        VStack(alignment: .leading) {
-                            Text("\(row.down) v \(row.across)").font(.headline)
-                            Text("#\(row.index + 1) · \(row.size)×\(row.size) · \(row.length) moves · \(row.winnerName) won as \(row.colour)")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
+                compactList
             } else {
                 table
             }
         }
         .sheet(item: $replaying) { record in
             ReplayView(record: record, names: analysis.names)
+        }
+    }
+
+    /// A phone has no room for two thousand rows, and nobody reads them there.
+    /// The longest games — the hardest fought — come first, five at a time.
+    private var compactList: some View {
+        let sorted = analysis.games.sorted {
+            longestFirst ? ($0.length, $1.index) > ($1.length, $0.index) : ($0.length, $0.index) < ($1.length, $1.index)
+        }
+        let shown = showsAll ? sorted : Array(sorted.prefix(5))
+        return List {
+            Section {
+                ForEach(shown) { game in
+                    Button { replaying = game } label: {
+                        let down = analysis.names[game.down], across = analysis.names[game.across]
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(down) v \(across)").font(.headline)
+                                Text("#\(game.index + 1) · \(game.size)×\(game.size) · \(game.winner == .blue ? down : across) won as \(game.winner.displayName)")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text("\(game.length)").font(.title3.monospacedDigit().weight(.semibold))
+                            Text("moves").font(.caption).foregroundStyle(.secondary)
+                        }
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if sorted.count > 5 {
+                    Button(showsAll ? "Show Five" : "Show All \(sorted.count) Games") { showsAll.toggle() }
+                }
+            } header: {
+                Picker("Order", selection: $longestFirst) {
+                    Text("Longest first").tag(true)
+                    Text("Shortest first").tag(false)
+                }
+                .pickerStyle(.segmented)
+                .textCase(nil)
+                .padding(.bottom, 6)
+            }
         }
     }
 

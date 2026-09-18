@@ -23,14 +23,8 @@ struct FindingsSections: View {
                     }
                     .padding(.vertical, 2)
                 }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Caveat").font(.subheadline.weight(.semibold))
-                    Text(findings.caveat).foregroundStyle(.secondary)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Next experiment").font(.subheadline.weight(.semibold))
-                    Text(findings.nextExperiment).foregroundStyle(.secondary)
-                }
+                callout("Caveat", findings.caveat, symbol: "exclamationmark.triangle", tint: .orange)
+                callout("Next experiment", findings.nextExperiment, symbol: "arrow.forward.circle", tint: .accentColor)
             } else {
                 Text("Nothing written yet.").foregroundStyle(.secondary)
             }
@@ -68,10 +62,12 @@ struct FindingsSections: View {
         }
 
         Section {
-            ForEach(facts) { fact in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(fact.id).font(.caption.monospaced()).foregroundStyle(.secondary).fixedSize().frame(minWidth: 30, alignment: .leading)
-                    Text(fact.text).font(.callout).textSelection(.enabled)
+            DisclosureGroup("All \(facts.count) facts") {
+                ForEach(facts) { fact in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(fact.id).font(.caption.monospaced()).foregroundStyle(.secondary).fixedSize().frame(minWidth: 30, alignment: .leading)
+                        Text(fact.text).font(.callout).textSelection(.enabled)
+                    }
                 }
             }
         } header: {
@@ -84,17 +80,45 @@ struct FindingsSections: View {
 
     private func evidence(for finding: Findings.Finding, in findings: Findings) -> some View {
         let cited = finding.facts.compactMap(findings.fact)
-        return VStack(alignment: .leading, spacing: 3) {
+        // The chip sits on the first line of its fact, in a fixed column, so a
+        // two-line fact neither centres its chip nor pushes the text around.
+        // More than two are folded away: the statement is the point.
+        return Group {
+            if cited.count > 2 {
+                DisclosureGroup("\(cited.count) supporting facts") { evidenceRows(cited) }
+                    .font(.caption)
+            } else {
+                evidenceRows(cited)
+            }
+        }
+    }
+
+    private func evidenceRows(_ cited: [Fact]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
             ForEach(cited) { fact in
-                Label {
-                    Text(fact.text).font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } icon: {
-                    Text(fact.id).font(.caption2.monospaced().weight(.semibold))
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(fact.id)
+                        .font(.caption2.monospaced().weight(.semibold))
                         .fixedSize()
                         .padding(.horizontal, 5).padding(.vertical, 1)
                         .background(.quaternary, in: .capsule)
+                        .frame(width: 38, alignment: .leading)
+                    Text(fact.text).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
+            }
+        }
+    }
+
+    /// Caveat and next step: part of the write-up, so full weight, set apart by
+    /// an icon rather than by greying them out.
+    private func callout(_ title: String, _ text: String, symbol: String, tint: Color) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: symbol).foregroundStyle(tint)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.subheadline.weight(.semibold))
+                Text(text)
             }
         }
     }

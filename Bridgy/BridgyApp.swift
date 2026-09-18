@@ -70,7 +70,8 @@ struct BridgyApp: App {
             ImmersiveBoardView(
                 configuration: model.configuration,
                 theme: model.settings.theme,
-                style: model.settings.boardStyle
+                style: model.settings.boardStyle,
+                agentEngine: model.agentEngine
             )
             .environment(model)
         }

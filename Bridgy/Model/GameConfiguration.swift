@@ -6,10 +6,15 @@ import Foundation
 enum Seat: Hashable, Codable, Sendable {
     case human
     case computer(Difficulty)
+    /// A trained agent, by id. The name is kept so a saved game still reads
+    /// sensibly if the agent is later deleted.
+    case agent(UUID, name: String)
 
     var isComputer: Bool {
-        if case .computer = self { return true }
-        return false
+        switch self {
+        case .human: false
+        case .computer, .agent: true
+        }
     }
 
     var difficulty: Difficulty? {
@@ -21,6 +26,7 @@ enum Seat: Hashable, Codable, Sendable {
         switch self {
         case .human: return "You"
         case .computer(let level): return level.displayName
+        case .agent(_, let name): return name
         }
     }
 
@@ -28,6 +34,7 @@ enum Seat: Hashable, Codable, Sendable {
         switch self {
         case .human: return "person"
         case .computer(let level): return level.symbolName
+        case .agent: return "brain"
         }
     }
 }

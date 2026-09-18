@@ -95,6 +95,31 @@ final class AgentStore {
         return network
     }
 
+    /// The agent as a single shareable file.
+    func file(for agent: SavedAgent) throws -> AgentFile {
+        AgentFile(agent: agent, weights: try weights(for: agent))
+    }
+
+    /// Adds an agent from a file. One that is already here comes in as a copy
+    /// with its own id, so importing never overwrites anything.
+    @discardableResult
+    func importAgent(from url: URL) throws -> SavedAgent {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+        let file = try AgentFile.decode(try Data(contentsOf: url))
+        var agent = file.agent
+        if agents.contains(where: { $0.id == agent.id }) {
+            agent = SavedAgent(
+                id: UUID(), name: agent.name + " (copy)", parameters: agent.parameters,
+                rounds: agent.rounds, steps: agent.steps, created: agent.created,
+                updated: .now, benchmarks: agent.benchmarks
+            )
+        }
+        let weights = try NetworkWeights(architecture: agent.parameters.architecture, data: file.weights)
+        try save(agent, weights: weights)
+        return agent
+    }
+
     func rename(_ agent: SavedAgent, to name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, var updated = agents.first(where: { $0.id == agent.id }) else { return }

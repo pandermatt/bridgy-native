@@ -37,6 +37,13 @@ final class AppModel {
         if let resumable { configuration = resumable.configuration }
     }
 
+    /// Plays a saved agent in a game: its network with its own search depth.
+    func agentEngine(_ id: UUID) -> (any Engine)? {
+        guard let agent = agents.agents.first(where: { $0.id == id }),
+              let network = agents.network(for: agent) else { return nil }
+        return NeuralMCTSEngine(network: network, simulations: agent.parameters.simulations, name: agent.name)
+    }
+
     func prepareAudio() {
         guard settings.soundEnabled else { return }
         sound.prepare()
@@ -51,7 +58,8 @@ final class AppModel {
             configuration: configuration,
             settings: settings,
             sound: sound,
-            store: store
+            store: store,
+            agentEngine: agentEngine
         )
         self.session = session
         resumable = nil
@@ -68,7 +76,8 @@ final class AppModel {
             settings: settings,
             sound: sound,
             store: store,
-            state: snapshot.state
+            state: snapshot.state,
+            agentEngine: agentEngine
         )
         self.session = session
         self.configuration = snapshot.configuration

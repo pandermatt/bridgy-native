@@ -18,6 +18,12 @@ final class ExperimentRunner {
 
     private var task: Task<Void, Never>?
     private static let publishInterval = Duration.milliseconds(150)
+    /// Set by the app so the Live Activity's Stop can reach the library.
+    @ObservationIgnored var library: ExperimentLibrary?
+    @ObservationIgnored private lazy var live = RunActivityController(kind: .experiment) { [weak self] in
+        guard let self, let library = self.library else { return }
+        self.stop(library: library)
+    }
 
     var isRunning: Bool { runningID != nil }
 
@@ -46,6 +52,8 @@ final class ExperimentRunner {
         library.save(experiment, games: [])
 
         let jobs = Self.jobs(for: experiment)
+        self.library = library
+        live.start(title: experiment.name, headline: experiment.question)
         let hypothesis = experiment.hypothesis
         runningID = experiment.id
         records = []
@@ -54,6 +62,7 @@ final class ExperimentRunner {
         task = Task { [weak self] in
             let clock = ContinuousClock()
             var lastPublish = clock.now
+            var lastSave = clock.now
             var working: [GameRecord] = []
             var test = hypothesis.map { SequentialTest(p0: $0.p0, p1: $0.p1, alpha: $0.alpha, beta: $0.beta) }
             for await outcome in Tournament.stream(jobs: jobs, participants: participants) {
@@ -66,6 +75,14 @@ final class ExperimentRunner {
                     lastPublish = clock.now
                     self?.records = working
                     self?.sequential = test
+                    self?.updateLive(experiment, played: working.count, test: test)
+                }
+                // Saved as it goes, so quitting or a crash keeps what was played.
+                if clock.now - lastSave >= .seconds(5) {
+                    lastSave = clock.now
+                    var partial = experiment
+                    partial.gamesPlayed = working.count
+                    library.save(partial, games: working)
                 }
                 // Decided: stop here. Breaking out ends the stream, which
                 // cancels the games still in flight.
@@ -79,6 +96,26 @@ final class ExperimentRunner {
             self.sequential = test
             library.save(done, games: working)
             self.runningID = nil
+            self.live.end(finalHeadline: Self.verdict(test) ?? "Finished: \(working.count) games",
+                          detail: experiment.name)
+        }
+    }
+
+    private func updateLive(_ experiment: Experiment, played: Int, test: SequentialTest?) {
+        let progress = experiment.kind == .hypothesis
+            ? nil
+            : Double(played) / Double(max(experiment.scheduledGames, 1))
+        let detail = experiment.kind == .hypothesis
+            ? "\(test?.wins ?? 0) of \(played) won"
+            : "\(played) of \(experiment.scheduledGames) games"
+        live.update(progress: progress, headline: experiment.question, detail: detail)
+    }
+
+    private static func verdict(_ test: SequentialTest?) -> String? {
+        switch test?.decision {
+        case .acceptH1?: "Claim supported"
+        case .acceptH0?: "Claim rejected"
+        default: nil
         }
     }
 
@@ -91,6 +128,7 @@ final class ExperimentRunner {
         experiment.gamesPlayed = records.count
         library.save(experiment, games: records)
         runningID = nil
+        live.end(finalHeadline: nil)
     }
 
     // MARK: - Building a run

@@ -2,9 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Multiple scenes: an immersive space is a second scene, and there is no
-	     INFOPLIST_KEY_ alias for this. Document types: agents travel as
-	     .bridgyagent files. Both merge with the generated keys. -->
+	<!--
+		Agents travel as .bridgyagent files — shared, AirDropped, opened from Files
+		or Finder — which needs an exported type and a document type. Neither has
+		an INFOPLIST_KEY_ alias, so they live here and merge with the generated keys.
+	-->
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -20,13 +22,6 @@
 			</array>
 		</dict>
 	</array>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<false/>
-	<key>UIApplicationSceneManifest</key>
-	<dict>
-		<key>UIApplicationSupportsMultipleScenes</key>
-		<true/>
-	</dict>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
