@@ -24,10 +24,8 @@ struct LabScreen: View {
                         }
                     }
                 }
-                if library.experiments.isEmpty {
-                    starters
-                } else {
-                    Section("Experiments") {
+                if !library.experiments.isEmpty {
+                    Section {
                         ForEach(library.experiments) { experiment in
                             NavigationLink(value: experiment.id) { row(experiment) }
                                 .contextMenu {
@@ -39,9 +37,15 @@ struct LabScreen: View {
                         .onDelete { offsets in
                             for index in offsets { delete(library.experiments[index]) }
                         }
+                    } header: {
+                        Text("Your experiments")
+                    } footer: {
+                        Text("Start another with +.")
                     }
-                    starters
                 }
+            }
+            .overlay {
+                if library.experiments.isEmpty { emptyState }
             }
             .navigationTitle("Lab")
             .navigationDestination(for: UUID.self) { id in
@@ -50,9 +54,7 @@ struct LabScreen: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
-                        ForEach(Experiment.Kind.allCases) { kind in
-                            Button { drafting = kind } label: { Label(kind.title, systemImage: kind.symbol) }
-                        }
+                        newExperimentItems
                     } label: {
                         Label("New Experiment", systemImage: "plus")
                     }
@@ -111,26 +113,46 @@ struct LabScreen: View {
         library.delete(experiment.id)
     }
 
-    /// Ready-made questions, one tap from an answer.
-    private var starters: some View {
-        Section {
-            ForEach(Experiment.Kind.allCases) { kind in
-                Button { drafting = kind } label: {
-                    Label {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(kind.title).foregroundStyle(.primary)
-                            Text(kind.summary).font(.caption).foregroundStyle(.secondary)
+    /// No experiments yet: what + does, and what each kind is for.
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label("No Experiments Yet", systemImage: "flask")
+        } description: {
+            VStack(spacing: 16) {
+                Text("Press + to start one. There are three kinds:")
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(Experiment.Kind.allCases) { kind in
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Image(systemName: kind.symbol)
+                                .foregroundStyle(.tint)
+                                .frame(width: 24)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(kind.title).font(.headline).foregroundStyle(.primary)
+                                Text(kind.summary).font(.callout)
+                            }
                         }
-                    } icon: {
-                        Image(systemName: kind.symbol)
                     }
                 }
-                .buttonStyle(.plain)
+                .multilineTextAlignment(.leading)
+                Text("Every game is kept, seeded and replayable, so any result can be checked or reproduced.")
+                    .font(.footnote)
             }
-        } header: {
-            Text("New experiment")
-        } footer: {
-            Text("Every game is kept, seeded and replayable, so any result here can be checked — or reproduced from its seed.")
+            .frame(maxWidth: 440)
+        } actions: {
+            Menu {
+                newExperimentItems
+            } label: {
+                Label("New Experiment", systemImage: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(.top, showsAgentsLink ? 60 : 0)
+    }
+
+    @ViewBuilder
+    private var newExperimentItems: some View {
+        ForEach(Experiment.Kind.allCases) { kind in
+            Button { drafting = kind } label: { Label(kind.title, systemImage: kind.symbol) }
         }
     }
 }

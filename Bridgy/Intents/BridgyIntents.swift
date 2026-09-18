@@ -88,6 +88,51 @@ struct AgentQuery: EntityQuery {
     }
 }
 
+/// The game on screen, so "this game" means something to Siri.
+struct GameEntity: AppEntity {
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Game"
+    static let defaultQuery = GameQuery()
+
+    let id: UUID
+    let summary: String
+    let status: String
+
+    var displayRepresentation: DisplayRepresentation {
+        DisplayRepresentation(title: "\(summary)", subtitle: "\(status)")
+    }
+
+    @MainActor
+    init(_ session: GameSession) {
+        id = session.id
+        summary = session.configuration.summary
+        var lines = [session.statusText, "\(session.state.moveCount) moves played."]
+        if let down = session.readout.blue { lines.append("\(Player.blue.displayName) needs \(down) more.") }
+        if let across = session.readout.red { lines.append("\(Player.red.displayName) needs \(across) more.") }
+        status = lines.joined(separator: " ")
+    }
+}
+
+extension GameEntity: Transferable {
+    static var transferRepresentation: some TransferRepresentation {
+        ProxyRepresentation { "Bridgy game, \($0.summary). \($0.status)" }
+    }
+}
+
+struct GameQuery: EntityQuery {
+    @Dependency var model: AppModel
+
+    func entities(for identifiers: [UUID]) async throws -> [GameEntity] {
+        await MainActor.run {
+            guard let session = model.session, identifiers.contains(session.id) else { return [] }
+            return [GameEntity(session)]
+        }
+    }
+
+    func suggestedEntities() async throws -> [GameEntity] {
+        await MainActor.run { model.session.map { [GameEntity($0)] } ?? [] }
+    }
+}
+
 enum OpponentOption: String, AppEnum {
     case easy, casual, medium, hard, expert, perfect
 
@@ -134,6 +179,35 @@ struct StartGameIntent: AppIntent {
         model.startGame(configuration)
         model.requestedTab = .play
         return .result()
+    }
+}
+
+/// "What move should I play?" — highlights the suggestion on the board and
+/// says it aloud. The same suggestion as the Hint button.
+struct SuggestMoveIntent: AppIntent {
+    static let title: LocalizedStringResource = "Suggest a Move"
+    static let description = IntentDescription("Shows the recommended move on the board in the game you're playing, and says where it is.")
+    static let supportedModes: IntentModes = .foreground(.immediate)
+
+    @Dependency var model: AppModel
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let session = model.session else {
+            return .result(dialog: "There's no game in progress. Start one in Bridgy first.")
+        }
+        model.requestedTab = .play
+        if session.state.isOver {
+            return .result(dialog: "This game is over. Start a new one and ask again.")
+        }
+        guard session.isHumanTurn else {
+            return .result(dialog: "It's not your turn yet — wait for \(session.currentSeat.displayName) to move.")
+        }
+        guard let move = await session.suggestMove() else {
+            return .result(dialog: "I couldn't find a move to suggest.")
+        }
+        let text = "Play \(session.describe(move)). \(session.reason(for: move)) It's highlighted on the board."
+        return .result(dialog: IntentDialog(stringLiteral: text))
     }
 }
 
@@ -250,6 +324,16 @@ struct BridgyShortcuts: AppShortcutsProvider {
             intent: StartGameIntent(),
             phrases: ["Start a game in \(.applicationName)", "Play \(.applicationName) against \(\.$opponent)"],
             shortTitle: "Start a Game", systemImageName: "play.circle"
+        )
+        AppShortcut(
+            intent: SuggestMoveIntent(),
+            phrases: [
+                "What move should I play in \(.applicationName)",
+                "Recommend a move in \(.applicationName)",
+                "Give me a hint in \(.applicationName)",
+                "What's my best move in \(.applicationName)"
+            ],
+            shortTitle: "Suggest a Move", systemImageName: "lightbulb"
         )
         AppShortcut(
             intent: SummarizeExperimentIntent(),

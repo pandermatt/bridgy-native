@@ -1,3 +1,4 @@
+import AppIntents
 import BridgyEngine
 import SwiftUI
 
@@ -21,6 +22,8 @@ struct GameScreen: View {
             .toolbar { actions(settings: $settings) }
             .gameScreenTitleDisplayMode()
             .modifier(GameFeedback(session: session, settings: model.settings, isWatching: isWatching))
+            // Siri can see which game is on screen, so "what should I play here?" has an answer.
+            .appEntityIdentifier(EntityIdentifier(for: GameEntity.self, identifier: session.id))
             .onAppear { session.begin() }
             .onDisappear { session.stop() }
             .onChange(of: session.state.winner) { _, winner in showingResult = winner != nil }
@@ -50,6 +53,11 @@ struct GameScreen: View {
             if isWatching {
                 paceControls(settings: settings)
             }
+            #if os(iOS)
+            if !isWatching, session.configuration.soloHumanPlayer != nil, model.settings.showsSiriHintTip {
+                SiriTipView(intent: SuggestMoveIntent(), isVisible: settings.showsSiriHintTip)
+            }
+            #endif
         }
     }
 

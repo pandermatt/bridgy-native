@@ -12,6 +12,8 @@ import Observation
 @MainActor
 @Observable
 final class GameSession {
+    /// Identifies this game to Siri and Shortcuts.
+    let id = UUID()
 
     /// Moves each player still needs, computed off the main actor and cached.
     ///
@@ -129,17 +131,54 @@ final class GameSession {
 
     /// Suggests what a strong engine would play here, and shows it on the board.
     func requestHint() {
-        guard isHumanTurn else { return }
+        Task { await suggestMove() }
+    }
+
+    /// Works out the suggestion, shows it on the board and hands it back — the
+    /// Hint button and Siri both come through here.
+    @discardableResult
+    func suggestMove() async -> Move? {
+        guard isHumanTurn else { return nil }
         let snapshot = state
-        Task { [weak self] in
-            let move = await Self.think(
-                engine: ShortestPathEngine(strategy: .balanced, tieBreak: .disturbOpponent),
-                state: snapshot,
-                seed: UInt64.random(in: .min ... .max)
-            )
-            guard let self, !Task.isCancelled else { return }
-            self.hintMove = move
+        let move = await Self.think(
+            engine: ShortestPathEngine(strategy: .balanced, tieBreak: .disturbOpponent),
+            state: snapshot,
+            seed: UInt64.random(in: .min ... .max)
+        )
+        guard !Task.isCancelled, state == snapshot else { return nil }
+        hintMove = move
+        return move
+    }
+
+    /// A move in words, as the person would find it on the board: which way
+    /// the bridge runs for them, and where, counted from the top left.
+    func describe(_ move: Move) -> String {
+        let mover = state.current
+        let direction = move.isVertical(for: mover) ? "vertical" : "horizontal"
+        let centre = board.center(of: move)
+        // Lattice points run 0...2n; cells sit on odd and even rows alike, so
+        // halve and round up to get a 1-based row and column.
+        let row = centre.y / 2 + 1, column = centre.x / 2 + 1
+        return "the \(direction) bridge in row \(row), column \(column)"
+    }
+
+    /// Why the move is good, in one clause, from how it changes the race.
+    func reason(for move: Move) -> String {
+        let me = state.current
+        var after = state
+        after.apply(move)
+        if after.winner == me { return "It wins the game." }
+        let mineBefore = ShortestPath.movesToWin(in: state, for: me) ?? 99
+        let theirsBefore = ShortestPath.movesToWin(in: state, for: me.opponent) ?? 99
+        let mineAfter = ShortestPath.movesToWin(in: after, for: me) ?? 99
+        let theirsAfter = ShortestPath.movesToWin(in: after, for: me.opponent) ?? 99
+        if theirsAfter > theirsBefore, theirsBefore <= mineBefore {
+            return "It blocks \(me.opponent.displayName)'s shortest route."
         }
+        if mineAfter < mineBefore {
+            return mineAfter == 1 ? "It leaves you one move from crossing." : "It gets you a move closer: \(mineAfter) to go."
+        }
+        return "It keeps your routes open while slowing \(me.opponent.displayName) down."
     }
 
     // MARK: - Playing

@@ -16,6 +16,8 @@ final class AppSettings {
     var showHints: Bool { didSet { store(showHints, "showHints") } }
     var highlightsWinningPath: Bool { didSet { store(highlightsWinningPath, "highlightsWinningPath") } }
     var hasSeenWelcome: Bool { didSet { store(hasSeenWelcome, "hasSeenWelcome") } }
+    /// The "ask Siri for a move" tip under the board, until it is closed.
+    var showsSiriHintTip: Bool { didSet { store(showsSiriHintTip, "showsSiriHintTip") } }
 
     var watchPace: WatchPace {
         didSet {
@@ -54,6 +56,7 @@ final class AppSettings {
         showHints = defaults.object(forKey: "showHints") as? Bool ?? false
         highlightsWinningPath = defaults.object(forKey: "highlightsWinningPath") as? Bool ?? true
         hasSeenWelcome = defaults.object(forKey: "hasSeenWelcome") as? Bool ?? false
+        showsSiriHintTip = defaults.object(forKey: "showsSiriHintTip") as? Bool ?? true
         watchPace = WatchPace(
             movesPerSecond: defaults.object(forKey: "watchMovesPerSecond") as? Double
                 ?? WatchPace.default.movesPerSecond,
