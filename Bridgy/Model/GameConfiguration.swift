@@ -73,7 +73,7 @@ struct WatchPace: Hashable, Codable, Sendable {
     var allowsFullThinking: Bool
 
     static let `default` = WatchPace(movesPerSecond: 2, allowsFullThinking: false)
-    static let range: ClosedRange<Double> = 0.5...15
+    static let range: ClosedRange<Double> = 0.5...30
 
     /// Stands for "no pause at all". A plain number rather than infinity, which
     /// neither JSON nor the settings store will take.
@@ -103,7 +103,7 @@ struct WatchPace: Hashable, Codable, Sendable {
     }
 
     /// The slider works in log space so the slow end stays adjustable — the
-    /// difference between 0.5/s and 1/s matters as much as 10/s and 15/s. One
+    /// difference between 0.5/s and 1/s matters as much as 15/s and 30/s. One
     /// extra step past the fastest rate is Instant.
     var sliderPosition: Double {
         get { isInstant ? Self.sliderRange.upperBound : log2(movesPerSecond) }
