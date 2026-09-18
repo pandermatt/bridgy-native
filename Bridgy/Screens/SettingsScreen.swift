@@ -116,6 +116,14 @@ struct SettingsScreen: View {
             VictorySongSection(settings: settings)
 
             Section {
+                TextField("Your Name", text: $settings.sharePlayName)
+            } header: {
+                Text("SharePlay")
+            } footer: {
+                Text("What a friend sees you called when you play over FaceTime.")
+            }
+
+            Section {
                 Button("Show Tips Again") {
                     BridgyTips.resetOnNextLaunch()
                     tipsReset = true

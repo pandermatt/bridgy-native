@@ -21,6 +21,8 @@ final class AppSettings {
     /// Offer a song with a short Apple Music preview after a win. Off until
     /// asked for: it needs Apple Music access.
     var suggestsVictorySong: Bool { didSet { store(suggestsVictorySong, "suggestsVictorySong") } }
+    /// What a friend sees you called in a SharePlay game.
+    var sharePlayName: String { didSet { store(sharePlayName, "sharePlayName") } }
     /// Keep agents, experiments and games in step across devices via iCloud.
     var syncsWithICloud: Bool { didSet { store(syncsWithICloud, "syncsWithICloud") } }
     /// Puzzles finished, and how many of them were solved.
@@ -80,6 +82,7 @@ final class AppSettings {
         puzzlesSolved = defaults.integer(forKey: "puzzlesSolved")
         puzzlesTried = defaults.integer(forKey: "puzzlesTried")
         suggestsVictorySong = defaults.object(forKey: "suggestsVictorySong") as? Bool ?? false
+        sharePlayName = defaults.string(forKey: "sharePlayName") ?? ""
         // "Lemonade" by SOPHIE.
         victorySongID = defaults.string(forKey: "victorySongID") ?? "1528287372"
         watchPace = WatchPace(

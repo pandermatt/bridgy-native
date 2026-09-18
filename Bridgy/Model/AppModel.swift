@@ -91,11 +91,32 @@ final class AppModel {
         return session
     }
 
+    /// Starts a game against a friend on the call. Unlike `startGame`, this
+    /// leaves your saved game and last setup alone.
+    @discardableResult
+    func startSharedGame(_ configuration: GameConfiguration, state: GameState) -> GameSession {
+        if let session, !session.configuration.isShared { parkSession() }
+        session?.stop()
+        let session = GameSession(
+            configuration: configuration,
+            settings: settings,
+            sound: sound,
+            store: store,
+            state: state,
+            agentEngine: agentEngine
+        )
+        self.session = session
+        return session
+    }
+
+    @ObservationIgnored lazy var sharePlay = SharePlayGame(model: self)
+
     /// Leaving Play: park the live game. The tab comes back to setup, and the
     /// game is offered there as Continue rather than resuming mid-move under
     /// someone who went to look at Settings.
     func parkSession() {
-        guard let session else { return }
+        // A friend is still playing: the game waits on the Play tab.
+        guard let session, !session.configuration.isShared else { return }
         session.suspend()
         self.session = nil
         resumable = store.load()

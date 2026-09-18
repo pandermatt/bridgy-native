@@ -9,12 +9,20 @@ enum Seat: Hashable, Codable, Sendable {
     /// A trained agent, by id. The name is kept so a saved game still reads
     /// sensibly if the agent is later deleted.
     case agent(UUID, name: String)
+    /// Someone on the other end of a SharePlay call. Their moves arrive over
+    /// the network, so the seat is neither yours to tap nor a computer's.
+    case friend(name: String)
 
     var isComputer: Bool {
         switch self {
-        case .human: false
+        case .human, .friend: false
         case .computer, .agent: true
         }
+    }
+
+    var isFriend: Bool {
+        if case .friend = self { return true }
+        return false
     }
 
     var difficulty: Difficulty? {
@@ -27,6 +35,7 @@ enum Seat: Hashable, Codable, Sendable {
         case .human: return "You"
         case .computer(let level): return level.displayName
         case .agent(_, let name): return name
+        case .friend(let name): return name
         }
     }
 
@@ -35,6 +44,7 @@ enum Seat: Hashable, Codable, Sendable {
         case .human: return "person"
         case .computer(let level): return level.symbolName
         case .agent: return "brain"
+        case .friend: return "shareplay"
         }
     }
 }
@@ -54,13 +64,15 @@ struct GameConfiguration: Hashable, Codable, Sendable {
     }
 
     var isWatchOnly: Bool { blue.isComputer && red.isComputer }
-    var isLocalTwoPlayer: Bool { !blue.isComputer && !red.isComputer }
+    var isLocalTwoPlayer: Bool { blue == .human && red == .human }
+    /// Played over SharePlay, against someone on another device.
+    var isShared: Bool { blue.isFriend || red.isFriend }
 
-    /// The human's colour, when exactly one seat is human.
+    /// Your colour, when exactly one seat is yours on this device.
     var soloHumanPlayer: Player? {
-        switch (blue.isComputer, red.isComputer) {
-        case (false, true): return .blue
-        case (true, false): return .red
+        switch (blue == .human, red == .human) {
+        case (true, false): return .blue
+        case (false, true): return .red
         default: return nil
         }
     }

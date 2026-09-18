@@ -117,6 +117,10 @@ struct SetupScreen: View {
                 .listRowBackground(Color.clear)
             }
 
+            if !configuration.isWatchOnly {
+                SharePlaySection(size: configuration.size)
+            }
+
             Section {
                 TipView(PuzzleTip())
                 TipView(AgentTip())

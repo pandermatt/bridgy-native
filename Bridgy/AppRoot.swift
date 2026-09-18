@@ -63,7 +63,9 @@ struct AppRoot: View {
             model.settings.hasSeenWelcome = true
             showingWelcome = false
         }
+        .overlay(alignment: .top) { SharePlayNotice(sharePlay: model.sharePlay) }
         .task {
+            model.sharePlay.listen()
             // First launch only. Bridg-It is obscure enough that landing
             // straight on a lattice of dots explains nothing.
             if !model.settings.hasSeenWelcome { showingWelcome = true }

@@ -58,5 +58,7 @@
 			</dict>
 		</dict>
 	</array>
+	<key>NSSupportsGroupActivities</key>
+	<true/>
 </dict>
 </plist>

@@ -31,6 +31,7 @@ struct GameScreen: View {
     }
 
     private var isWatching: Bool { session.configuration.isWatchOnly }
+    private var isShared: Bool { session.configuration.isShared }
 
     var body: some View {
         @Bindable var settings = model.settings
@@ -95,11 +96,11 @@ struct GameScreen: View {
                 }
                 // Inline rather than a popover: popovers from toolbar buttons
                 // don't show in the iOS 26 toolbar.
-                if session.isHumanTurn, session.configuration.soloHumanPlayer != nil {
+                if session.isHumanTurn, session.configuration.soloHumanPlayer != nil, !isShared {
                     TipView(HintTip())
                 }
                 #if os(iOS)
-                if !isWatching, session.configuration.soloHumanPlayer != nil, model.settings.showsSiriHintTip {
+                if !isWatching, !isShared, session.configuration.soloHumanPlayer != nil, model.settings.showsSiriHintTip {
                     SiriTipView(intent: SuggestMoveIntent(), isVisible: settings.showsSiriHintTip)
                 }
                 #endif
@@ -123,7 +124,15 @@ struct GameScreen: View {
             Divider().frame(height: 22)
             gameOverButton("Share", "square.and.arrow.up") { sharing = true }
             Divider().frame(height: 22)
-            gameOverButton("Play Again", "arrow.clockwise") { session.restart() }
+            gameOverButton("Play Again", "arrow.clockwise") {
+                if !isShared {
+                    session.restart()
+                } else if model.sharePlay.isActive {
+                    model.sharePlay.playAgain()
+                } else {
+                    model.session = nil     // the call is over; back to setup
+                }
+            }
         }
         .padding(4)
         .gameOverGlass()
@@ -288,6 +297,7 @@ struct GameScreen: View {
     @ToolbarContentBuilder
     private func actions(settings: Bindable<AppSettings>) -> some ToolbarContent {
         #if os(visionOS)
+        if !isShared {
         ToolbarItem(placement: .primaryAction) {
             // The game as it stands, set up on a table in the room.
             Button {
@@ -296,6 +306,7 @@ struct GameScreen: View {
             } label: {
                 Label("Play on a Table", systemImage: "square.3.layers.3d")
             }
+        }
         }
         #endif
         ToolbarItem(placement: .primaryAction) {
@@ -318,6 +329,10 @@ struct GameScreen: View {
                 } label: {
                     Label("Stop", systemImage: "stop.fill")
                 }
+            } else if isShared {
+                Button(role: .destructive) { model.sharePlay.leave() } label: {
+                    Label("Leave SharePlay", systemImage: "rectangle.portrait.and.arrow.right")
+                }
             } else {
                 Button { session.undo() } label: {
                     Label("Undo", systemImage: "arrow.uturn.backward")
@@ -333,7 +348,7 @@ struct GameScreen: View {
 
             Menu {
                 appearanceItems(settings: settings)
-                if !isWatching {
+                if !isWatching, !isShared {
                     Divider()
                     Button { session.restart() } label: {
                         Label("Restart", systemImage: "arrow.clockwise")

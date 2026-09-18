@@ -98,11 +98,12 @@ final class GameSession {
     var currentSeat: Seat { configuration.seat(for: state.current) }
 
     var isHumanTurn: Bool {
-        !state.isOver && !currentSeat.isComputer
+        !state.isOver && currentSeat == .human
     }
 
+    /// Undo and hints would need both players' agreement in a shared game.
     var canUndo: Bool {
-        guard !configuration.isWatchOnly else { return false }
+        guard !configuration.isWatchOnly, !configuration.isShared else { return false }
         return state.canUndo
     }
 
@@ -126,6 +127,7 @@ final class GameSession {
             return "\(state.current.displayName) · \(currentSeat.displayName)"
         }
         if isThinking { return "\(currentSeat.displayName) is thinking…" }
+        if currentSeat.isFriend { return "\(currentSeat.displayName)’s move" }
         if configuration.isLocalTwoPlayer { return "\(state.current.displayName) to play" }
         if isHumanTurn { return "Your turn — \(state.current.goalDescription)" }
         return "\(currentSeat.displayName) is playing \(state.current.displayName)"
@@ -140,7 +142,7 @@ final class GameSession {
     /// Hint button and Siri both come through here.
     @discardableResult
     func suggestMove() async -> Move? {
-        guard isHumanTurn else { return nil }
+        guard isHumanTurn, !configuration.isShared else { return nil }
         let snapshot = state
         let move = await Self.think(
             engine: ShortestPathEngine(strategy: .balanced, tieBreak: .disturbOpponent),
@@ -196,7 +198,36 @@ final class GameSession {
         guard isHumanTurn, state.isLegal(move) else { return false }
         Task { await BridgyTipEvents.movePlayed.donate() }
         commit(move)
+        onLocalMove?(move)
         return true
+    }
+
+    // MARK: - SharePlay
+
+    /// Told about each move played on this device, to send to the friend.
+    @ObservationIgnored var onLocalMove: ((Move) -> Void)?
+
+    /// Their name arrived after the game began.
+    func renameFriend(_ name: String) {
+        if configuration.blue.isFriend { configuration.blue = .friend(name: name) }
+        if configuration.red.isFriend { configuration.red = .friend(name: name) }
+    }
+
+    /// The friend's move, as it arrives.
+    func playRemote(_ move: Move) {
+        guard !state.isOver, currentSeat.isFriend, state.isLegal(move) else { return }
+        commit(move)
+    }
+
+    /// The whole game, from the friend's copy, when ours fell out of step.
+    func replace(with position: GameState) {
+        guard position.board == state.board else { return }
+        cancelThinking()
+        state = position
+        hintMove = nil
+        hasFinished = position.isOver
+        if position.isOver { captureWinningPath() } else { winningPath = nil }
+        refreshReadout()
     }
 
     func undo() {
@@ -245,7 +276,7 @@ final class GameSession {
         cancelThinking()
         sound.stopAll()
         hasFinished = true
-        store.clear()
+        if !configuration.isShared { store.clear() }
     }
 
     /// Leaving the Play tab: stop working and latch paused, so nothing carries
@@ -295,7 +326,7 @@ final class GameSession {
         if state.isOver {
             hasFinished = true
             captureWinningPath()
-            store.clear()
+            if !configuration.isShared { store.clear() }
         } else {
             scheduleSave()
         }
@@ -405,7 +436,7 @@ final class GameSession {
             if settings.soundEnabled { sound.playWin() }
             hasFinished = true
             captureWinningPath()
-            store.clear()
+            if !configuration.isShared { store.clear() }
         } else {
             scheduleSave()
         }
@@ -437,7 +468,7 @@ final class GameSession {
             let made = agentEngine(id) ?? engine(for: .medium, budget: budget)
             agentCache[id] = made
             return made
-        case .human:
+        case .human, .friend:
             return engine(for: .medium, budget: budget)
         }
     }
@@ -514,6 +545,9 @@ final class GameSession {
     private func flushSave() {
         saveTask?.cancel()
         saveTask = nil
+        // A shared game can't be resumed alone, and mustn't replace the
+        // game you had going before the call.
+        guard !configuration.isShared else { return }
         guard !state.isOver, state.moveCount > 0 else {
             store.clear()
             return
