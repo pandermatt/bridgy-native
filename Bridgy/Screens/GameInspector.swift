@@ -12,6 +12,10 @@ struct GameInspector: View {
         nonmutating set { session.reviewIndex = newValue }
     }
     @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
     @State private var judgeID: UUID?
     /// Down's chance of winning after each number of moves, as the judge sees it.
     @State private var estimates: [Int: Double] = [:]
@@ -32,6 +36,18 @@ struct GameInspector: View {
             movesSection
         }
         .formStyle(.grouped)
+        .navigationTitle("Game")
+        .inspectorTitleDisplay()
+        .toolbar {
+            #if os(iOS)
+            // On iPhone the inspector is a sheet, and a sheet needs a way out.
+            if sizeClass == .compact {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            #endif
+        }
         .task(id: EstimateKey(moves: state.moveCount, judge: judge?.id, size: state.board.size)) {
             await refreshEstimates()
         }
@@ -153,7 +169,11 @@ struct GameInspector: View {
                         Text("\(index + 1).").monospacedDigit().foregroundStyle(.secondary)
                             .frame(width: 34, alignment: .trailing)
                         Circle().fill(model.settings.theme.color(for: player)).frame(width: 8, height: 8)
-                        Text(move.description).monospaced()
+                        Image(systemName: move.isVertical(for: player) ? "arrow.up.and.down" : "arrow.left.and.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 16)
+                        Text(Self.place(of: move, on: state.board)).monospacedDigit()
                         Spacer()
                         if let down = estimates[index + 1] {
                             Text("\(Int((down * 100).rounded()))%")
@@ -170,9 +190,26 @@ struct GameInspector: View {
             Text("Moves")
         } footer: {
             if !state.moves.isEmpty {
-                Text("Click a move to see the board as it was then.")
+                Text(footerText)
             }
         }
+    }
+
+    private var footerText: String {
+        #if os(macOS)
+        let verb = "Click"
+        #else
+        let verb = "Tap"
+        #endif
+        let estimate = estimates.isEmpty ? "" : " The percentage is Down's chance of winning after that move."
+        return "\(verb) a move to see the board as it was then.\(estimate)"
+    }
+
+    /// Where a move sits, counted from the top left the way the board reads:
+    /// "row 3, col 2".
+    static func place(of move: Move, on board: Board) -> String {
+        let centre = board.center(of: move)
+        return "row \(centre.y / 2 + 1), col \(centre.x / 2 + 1)"
     }
 
     // MARK: - Work
@@ -220,5 +257,16 @@ struct GameInspector: View {
         let value = Double(network.judge(state).value)
         let mover = (value + 1) / 2
         return state.current == .blue ? mover : 1 - mover
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func inspectorTitleDisplay() -> some View {
+        #if os(iOS)
+        navigationBarTitleDisplayMode(.inline)
+        #else
+        self
+        #endif
     }
 }

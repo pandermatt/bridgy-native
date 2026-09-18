@@ -24,6 +24,7 @@ struct BoardCanvas: View {
     var hint: Move?
     /// The halo on the move just played — off for a finished board being shared.
     var highlightsLastMove = true
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         GeometryReader { proxy in
@@ -86,8 +87,11 @@ struct BoardCanvas: View {
                 }
             }
             let colour = theme.color(for: player)
-            context.fill(path, with: .color(style.dots == .connectedOnly ? colour : colour.opacity(0.45)))
-            context.fill(guides, with: .color(colour.opacity(0.28)))
+            // Faint dots recede on white but vanish on black, so dark mode
+            // draws them brighter.
+            let dark = colorScheme == .dark
+            context.fill(path, with: .color(style.dots == .connectedOnly ? colour : colour.opacity(dark ? 0.72 : 0.45)))
+            context.fill(guides, with: .color(colour.opacity(dark ? 0.45 : 0.28)))
         }
     }
 

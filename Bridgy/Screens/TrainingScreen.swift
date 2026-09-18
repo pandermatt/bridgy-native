@@ -16,13 +16,14 @@ struct TrainingScreen: View {
 
     var body: some View {
         Form {
+            // What you have first, then what you can make.
+            agentsSection
             controlSection
             if !run.benchmarks.isEmpty || !run.gates.isEmpty { strengthSection }
             if !run.losses.isEmpty { lossSection }
             // While it trains there is nothing to set: the settings are fixed
             // for the run, and a screen of dead controls only gets in the way.
             if !run.isRunning { setupSections }
-            agentsSection
         }
         .formStyle(.grouped)
         .toolbar {
@@ -41,7 +42,7 @@ struct TrainingScreen: View {
                 importError = error.localizedDescription
             }
         }
-        .navigationTitle("Train an Agent")
+        .navigationTitle("Agents")
         .alert("Rename Agent", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $newName)
             Button("Rename") {
@@ -99,6 +100,8 @@ struct TrainingScreen: View {
                     .font(.footnote)
                     .foregroundStyle(.red)
             }
+        } header: {
+            Text("Train a new agent")
         } footer: {
             Text("Each round the best network so far plays itself, learns from those games on the GPU, and the result has to beat it to take its place. Training runs while this app is open.")
         }

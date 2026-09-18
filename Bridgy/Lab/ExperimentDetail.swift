@@ -77,7 +77,11 @@ struct ExperimentDetail: View {
         default:
             Form {
                 Section { pagePicker.listRowBackground(Color.clear).listRowInsets(EdgeInsets()) }
-                header(experiment, analysis: analysis)
+                if page == .overview {
+                    header(experiment, analysis: analysis)
+                } else if isRunning {
+                    Section { progressRow(experiment, analysis: analysis) }
+                }
                 switch page {
                 case .overview: overview(analysis)
                 case .statistics: StatisticsSections(analysis: analysis)
@@ -102,17 +106,7 @@ struct ExperimentDetail: View {
     private func header(_ experiment: Experiment, analysis: ExperimentAnalysis) -> some View {
         Section {
             Text(experiment.question).font(.headline)
-            if isRunning {
-                VStack(alignment: .leading, spacing: 6) {
-                    if experiment.kind == .hypothesis {
-                        ProgressView().progressViewStyle(.linear)
-                    } else {
-                        ProgressView(value: Double(analysis.games.count), total: Double(max(experiment.scheduledGames, 1)))
-                    }
-                    Text(progressText(experiment, played: analysis.games.count))
-                        .font(.footnote.monospacedDigit()).foregroundStyle(.secondary)
-                }
-            }
+            if isRunning { progressRow(experiment, analysis: analysis) }
             if let error = model.runner.error, !isRunning {
                 Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red).font(.footnote)
             }
@@ -122,6 +116,18 @@ struct ExperimentDetail: View {
             }
         } footer: {
             Text("\(experiment.kind.title) · \(experiment.created.formatted(date: .abbreviated, time: .shortened)) · Bridgy \(experiment.appVersion)")
+        }
+    }
+
+    private func progressRow(_ experiment: Experiment, analysis: ExperimentAnalysis) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if experiment.kind == .hypothesis {
+                ProgressView().progressViewStyle(.linear)
+            } else {
+                ProgressView(value: Double(analysis.games.count), total: Double(max(experiment.scheduledGames, 1)))
+            }
+            Text(progressText(experiment, played: analysis.games.count))
+                .font(.footnote.monospacedDigit()).foregroundStyle(.secondary)
         }
     }
 
@@ -202,6 +208,7 @@ struct MirrorOverview: View {
                 Text("All engines").tag(String?.none)
                 ForEach(analysis.names, id: \.self) { Text($0).tag(String?.some($0)) }
             }
+            .pickerStyle(.menu)
             Chart {
                 ForEach(points) { point in
                     LineMark(x: .value("Board size", point.size), y: .value("Down wins", point.record.rate))
@@ -350,7 +357,7 @@ struct StatisticsSections: View {
                 ForEach(order, id: \.self) { index in
                     let interval = ratings.ratingIntervals[index]
                     LabeledContent(analysis.names[index]) {
-                        Text("\(Int(ratings.fit.ratings[index].rounded()))  [\(Int(interval.low.rounded()))–\(Int(interval.high.rounded()))]")
+                        Text(verbatim: "\(Int(ratings.fit.ratings[index].rounded()))  (\(Int(interval.low.rounded()))–\(Int(interval.high.rounded())))")
                             .monospacedDigit()
                     }
                 }
@@ -358,9 +365,9 @@ struct StatisticsSections: View {
                 ProgressView("Fitting…")
             }
         } header: {
-            Text("Ratings")
+            Text("Fitted ratings")
         } footer: {
-            Text("Bradley–Terry strengths fitted to all games at once, on the Elo scale, with 95% bootstrap intervals (200 resamples). Unlike running Elo, the order games were played in makes no difference.")
+            Text("Fitted to all games at once (Bradley–Terry), with 95% bootstrap intervals. These differ from the Elo on the Overview, which is updated game by game and depends on the order games happened to finish in; these do not.")
         }
         .task(id: analysis.games.count / 25) { await fit() }
     }

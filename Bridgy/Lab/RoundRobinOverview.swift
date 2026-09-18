@@ -39,6 +39,12 @@ struct RoundRobinOverview: View {
             }
             .chartXSelection(value: $selectedGames)
             .chartYScale(domain: eloDomain(analysis))
+            .chartYAxis {
+                AxisMarks { value in
+                    AxisGridLine()
+                    AxisValueLabel { Text(verbatim: "\(Int(value.as(Double.self) ?? 0))") }
+                }
+            }
             .chartYAxisLabel("Elo")
             .chartXAxisLabel("Games played")
             .frame(height: 240)
@@ -213,7 +219,7 @@ struct RoundRobinOverview: View {
                     GridRow {
                         Text("").gridColumnAlignment(.leading)
                         ForEach(analysis.participants, id: \.self) { name in
-                            Text(String(name.prefix(4)))
+                            ParticipantMark(name: name)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
@@ -243,7 +249,8 @@ struct RoundRobinOverview: View {
 
             ForEach(Array(analysis.standings.enumerated()), id: \.offset) { index, entry in
                 LabeledContent {
-                    Text("\(Int(entry.rating.rounded()))").monospacedDigit()
+                    // Verbatim: ratings are never written "1'876".
+                    Text(verbatim: "\(Int(entry.rating.rounded()))").monospacedDigit()
                 } label: {
                     HStack {
                         Text("\(index + 1).").foregroundStyle(.secondary).monospacedDigit()
@@ -258,4 +265,30 @@ struct RoundRobinOverview: View {
         }
     }
 
+}
+
+/// A column header in the head-to-head grid: the level's own symbol, which
+/// fits where "Casual" and "Medium" had to be cut to "Casu" and "Medi". Agents
+/// get a brain and their initials.
+struct ParticipantMark: View {
+    let name: String
+
+    var body: some View {
+        if let level = Difficulty.allCases.first(where: { $0.displayName == name }) {
+            Image(systemName: level.symbolName)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(name)
+                .help(name)
+        } else {
+            Text(initials).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                .accessibilityLabel(name)
+                .help(name)
+        }
+    }
+
+    private var initials: String {
+        let words = name.split(separator: " ").filter { $0.first?.isLetter == true }
+        return String(words.prefix(2).compactMap(\.first)).uppercased()
+    }
 }

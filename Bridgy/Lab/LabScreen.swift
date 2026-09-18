@@ -141,13 +141,19 @@ struct LabScreen: View {
                 Menu {
                     newExperimentItems
                 } label: {
-                    // Menus in a list row drop a label's icon unless told otherwise.
+                    // Drawn by hand: a menu in a list row drops the label's icon
+                    // and washes out a bordered-prominent style, which in dark
+                    // mode made the button look disabled.
                     Label("New Experiment", systemImage: "plus")
                         .labelStyle(.titleAndIcon)
+                        .font(.headline)
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.accentColor, in: .capsule)
+                        .contentShape(.capsule)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .buttonStyle(.plain)
                 Text("Every game is kept, seeded and replayable, so any result can be checked or reproduced")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -203,7 +209,9 @@ struct NewExperimentSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Run") { create() }.disabled(!isValid)
+                    Button("Run") { create() }
+                        .disabled(!isValid)
+                        .prominentAction()
                 }
             }
         }

@@ -17,7 +17,7 @@ struct GameScreen: View {
             .padding(.horizontal)
             .padding(.top, 8)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            .navigationTitle(session.statusText)
+            .navigationTitle(title)
             .platformSubtitle(subtitle)
             .toolbar { actions(settings: $settings) }
             .gameScreenTitleDisplayMode()
@@ -102,8 +102,18 @@ struct GameScreen: View {
         .animation(isWatching ? nil : .smooth(duration: 0.18), value: session.state.moveCount)
     }
 
+    /// Short enough to survive the toolbar on a phone; the goal moves to the
+    /// subtitle, where "Your turn — top to…" used to be cut off.
+    private var title: String {
+        if session.isHumanTurn, !session.configuration.isLocalTwoPlayer { return "Your turn" }
+        return session.statusText
+    }
+
     private var subtitle: String {
         var parts = ["\(session.state.moveCount) moves"]
+        if session.isHumanTurn, !session.configuration.isLocalTwoPlayer {
+            parts.insert(session.state.current.goalDescription.capitalizedFirst, at: 0)
+        }
         if isWatching, session.isPaused { parts.append("paused") }
         return parts.joined(separator: " · ")
     }
@@ -336,4 +346,9 @@ extension View {
         self
         #endif
     }
+}
+
+extension String {
+    /// "top to bottom" → "Top to bottom".
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }

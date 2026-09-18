@@ -213,7 +213,11 @@ struct PlayTab: View {
             set: { showingInspector = $0 }
         )) {
             if let session = model.session {
+                #if os(iOS)
+                NavigationStack { GameInspector(session: session) }
+                #else
                 GameInspector(session: session)
+                #endif
             }
         }
     }

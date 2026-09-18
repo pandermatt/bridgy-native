@@ -80,7 +80,11 @@ struct HowToPlayScreen: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         } icon: {
-            Image(systemName: symbol).foregroundStyle(.tint)
+            // A fixed column, so every title starts at the same place however
+            // wide its symbol is.
+            Image(systemName: symbol)
+                .foregroundStyle(.tint)
+                .frame(width: 26)
         }
         .labelStyle(.titleAndIcon)
         .padding(.vertical, 4)
