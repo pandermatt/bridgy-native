@@ -14,6 +14,9 @@ final class AppModel {
     /// Lives here rather than on its screen so training carries on while you
     /// look at something else.
     let training = TrainingRun()
+    /// Also here, so a run keeps going — and its results stay — while you
+    /// switch to another part of the app.
+    let tournament = TournamentRun()
 
     /// The live game, if one is on screen.
     var session: GameSession?

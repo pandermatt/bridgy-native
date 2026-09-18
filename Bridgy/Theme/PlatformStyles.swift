@@ -54,3 +54,23 @@ extension View {
         #endif
     }
 }
+
+extension View {
+    /// A trailing inspector where the platform has one; visionOS has none, so
+    /// there it is a sheet.
+    @ViewBuilder
+    func platformInspector<Content: View>(
+        isPresented: Binding<Bool>,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        #if os(visionOS)
+        sheet(isPresented: isPresented) {
+            NavigationStack { content() }.frame(minWidth: 420, minHeight: 560)
+        }
+        #else
+        inspector(isPresented: isPresented) {
+            content().inspectorColumnWidth(min: 240, ideal: 280, max: 380)
+        }
+        #endif
+    }
+}

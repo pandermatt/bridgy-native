@@ -6,7 +6,7 @@ import SwiftUI
 /// Every engine against every other, plotted while it runs.
 struct TournamentScreen: View {
     @Environment(AppModel.self) private var model
-    @State private var run = TournamentRun()
+    private var run: TournamentRun { model.tournament }
     @State private var focus: String?
     /// Which colour the size chart shows. Bridg-It is not colour-symmetric,
     /// so the combined figure hides the most important fact about Perfect.
@@ -30,14 +30,14 @@ struct TournamentScreen: View {
         // button fell back to a small default push button. This matches Settings
         // and Setup, which both already use it.
         .formStyle(.grouped)
-        .navigationTitle("Tournament")
-        .onDisappear { run.stop() }
+        .navigationTitle("Lab")
     }
 
     // MARK: - Setup
 
     private var setupSection: some View {
-        Section {
+        @Bindable var run = run
+        return Section {
             // Plain Text labels, not LabeledContent: that expands to fill, which
             // is what pushed the stepper arrows to the far edge on macOS.
             Group {

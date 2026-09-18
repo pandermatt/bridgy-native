@@ -35,6 +35,8 @@ struct SavedAgent: Codable, Identifiable, Hashable, Sendable {
 final class AgentStore {
     private(set) var agents: [SavedAgent] = []
     private let directory: URL
+    /// Networks already read from disk, by agent and the save they came from.
+    @ObservationIgnored private var networks: [UUID: (updated: Date, network: NeuralNetwork)] = [:]
 
     init() {
         let base = (try? FileManager.default.url(
@@ -82,6 +84,15 @@ final class AgentStore {
     func weights(for agent: SavedAgent) throws -> NetworkWeights {
         let data = try Data(contentsOf: folder(agent.id).appendingPathComponent("weights.bin"))
         return try NetworkWeights(architecture: agent.parameters.architecture, data: data)
+    }
+
+    /// The agent's network, read once and kept.
+    func network(for agent: SavedAgent) -> NeuralNetwork? {
+        if let cached = networks[agent.id], cached.updated == agent.updated { return cached.network }
+        guard let weights = try? weights(for: agent) else { return nil }
+        let network = NeuralNetwork(weights: weights)
+        networks[agent.id] = (agent.updated, network)
+        return network
     }
 
     func rename(_ agent: SavedAgent, to name: String) {

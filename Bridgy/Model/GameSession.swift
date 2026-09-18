@@ -23,7 +23,12 @@ final class GameSession {
         var isStale = true
     }
 
-    private(set) var state: GameState
+    /// Any change to the position ends a review of an earlier one.
+    private(set) var state: GameState {
+        didSet { if reviewIndex != nil { reviewIndex = nil } }
+    }
+    /// An earlier position being looked at, counted in moves; nil is live.
+    var reviewIndex: Int?
     private(set) var configuration: GameConfiguration
     private(set) var isThinking = false
     private(set) var isPaused = false

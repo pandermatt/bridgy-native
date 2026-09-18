@@ -35,6 +35,14 @@ struct BridgyApp: App {
         .windowResizability(.contentMinSize)
         #endif
 
+        #if os(macOS)
+        Settings {
+            NavigationStack { SettingsScreen() }
+                .environment(model)
+                .frame(minWidth: 460, minHeight: 520)
+        }
+        #endif
+
         #if os(visionOS)
         ImmersiveSpace(id: BridgyApp.tableSpace) {
             ImmersiveBoardView(

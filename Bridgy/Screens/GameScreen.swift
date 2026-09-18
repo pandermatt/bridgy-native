@@ -6,6 +6,7 @@ struct GameScreen: View {
     @Bindable var session: GameSession
     @Environment(AppModel.self) private var model
     @State private var showingResult = false
+    @Binding var showingInspector: Bool
 
     private var isWatching: Bool { session.configuration.isWatchOnly }
 
@@ -23,6 +24,7 @@ struct GameScreen: View {
             .onAppear { session.begin() }
             .onDisappear { session.stop() }
             .onChange(of: session.state.winner) { _, winner in showingResult = winner != nil }
+
             .onChange(of: model.settings.watchPace) { _, _ in session.paceChanged() }
             .sheet(isPresented: $showingResult) {
                 ResultSheet(
@@ -51,7 +53,39 @@ struct GameScreen: View {
         }
     }
 
+    @ViewBuilder
     private var board: some View {
+        if let reviewIndex = session.reviewIndex {
+            reviewBoard(at: reviewIndex)
+        } else {
+            liveBoard
+        }
+    }
+
+    /// An earlier position, drawn but not playable, with the way back on it.
+    private func reviewBoard(at index: Int) -> some View {
+        var past = GameState(board: session.board)
+        for move in session.state.moves.prefix(index) { past.apply(move) }
+        return VStack(spacing: 8) {
+            Button {
+                session.reviewIndex = nil
+            } label: {
+                Label("Move \(index) of \(session.state.moveCount) — Back to the Game", systemImage: "arrow.uturn.forward")
+                    .font(.callout)
+            }
+            .buttonStyle(.bordered)
+            BoardCanvas(
+                state: past,
+                theme: model.settings.theme,
+                style: model.settings.boardStyle,
+                cap: model.settings.bridgeCap,
+                guideDots: true
+            )
+            .aspectRatio(1, contentMode: .fit)
+        }
+    }
+
+    private var liveBoard: some View {
         ZoomableBoard(enabled: session.board.size > 12) {
             BoardView(session: session, settings: model.settings)
         }
@@ -145,6 +179,12 @@ struct GameScreen: View {
     /// it.
     @ToolbarContentBuilder
     private func actions(settings: Bindable<AppSettings>) -> some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Button { showingInspector.toggle() } label: {
+                Label("Inspector", systemImage: "sidebar.right")
+            }
+            .keyboardShortcut("i", modifiers: [.command, .option])
+        }
         ToolbarItemGroup(placement: .primaryAction) {
             if isWatching {
                 Button {

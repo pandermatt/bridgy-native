@@ -135,6 +135,22 @@ public struct GameState: Sendable, Hashable, Codable {
         return removed
     }
 
+    /// A position given cell by cell, with no history. For analysis and tests:
+    /// it can describe positions no legal sequence reaches, such as the mirror
+    /// image of one with the colours swapped.
+    init(board: Board, owners: [Player?], toMove: Player) {
+        self.init(board: board)
+        for cell in owners.indices {
+            guard let owner = owners[cell] else { continue }
+            cells[cell] = owner
+            let (a, b) = board.endpoints(board.move(at: cell), for: owner)
+            if owner == .blue { blue.union(a, b) } else { red.union(a, b) }
+        }
+        current = toMove
+        if blue.connected(blueTop, blueBottom) { winner = .blue }
+        else if red.connected(redLeft, redRight) { winner = .red }
+    }
+
     private mutating func replay(_ history: [Move]) {
         cells = [Player?](repeating: nil, count: board.cellCount)
         moves = []
