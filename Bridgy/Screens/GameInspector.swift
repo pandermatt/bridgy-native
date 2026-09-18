@@ -130,8 +130,12 @@ struct GameInspector: View {
     private var estimateChart: some View {
         Chart {
             ForEach(estimates.sorted { $0.key < $1.key }, id: \.key) { move, down in
-                AreaMark(x: .value("Move", move), yStart: .value("Even", 0.5), yEnd: .value("Down", down))
-                    .foregroundStyle(model.settings.theme.color(for: down >= 0.5 ? .blue : .red).opacity(0.35))
+                // Two areas, one per side: a single series takes one
+                // colour, which painted Across's lead in Down's.
+                AreaMark(x: .value("Move", move), yStart: .value("Even", 0.5), yEnd: .value("Down", max(down, 0.5)), series: .value("Side", "Down"))
+                    .foregroundStyle(model.settings.theme.color(for: .blue).opacity(0.3))
+                AreaMark(x: .value("Move", move), yStart: .value("Even", 0.5), yEnd: .value("Down", min(down, 0.5)), series: .value("Side", "Across"))
+                    .foregroundStyle(model.settings.theme.color(for: .red).opacity(0.3))
                 LineMark(x: .value("Move", move), y: .value("Down", down))
                     .foregroundStyle(.secondary)
             }
@@ -238,25 +242,11 @@ struct GameInspector: View {
         let missing = wanted.filter { estimates[$0] == nil }
         guard !missing.isEmpty else { return }
         let computed = await Task.detached(priority: .utility) {
-            var results: [Int: Double] = [:]
-            var position = GameState(board: board)
-            var played = 0
-            for count in missing.sorted() {
-                if Task.isCancelled { break }
-                while played < count { position.apply(moves[played]); played += 1 }
-                results[count] = Self.downChance(position, network: network)
-            }
-            return results
+            WinEstimate.history(moves: moves, board: board, counts: missing, network: network)
         }.value
         estimates.merge(computed) { _, new in new }
     }
 
-    nonisolated private static func downChance(_ state: GameState, network: NeuralNetwork) -> Double {
-        if let winner = state.winner { return winner == .blue ? 1 : 0 }
-        let value = Double(network.judge(state).value)
-        let mover = (value + 1) / 2
-        return state.current == .blue ? mover : 1 - mover
-    }
 }
 
 private extension View {

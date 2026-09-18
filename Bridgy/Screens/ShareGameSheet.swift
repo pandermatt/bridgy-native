@@ -1,22 +1,15 @@
 import BridgyEngine
 import SwiftUI
 
-/// Shown when a game ends: the finished board, a style to draw it in, and a way
-/// to share it.
-///
-/// This replaced an `.alert`, which cannot host a `ShareLink` — and a finished
-/// board is worth more than a two-line dialog anyway.
-struct ResultSheet: View {
+/// Dressing a finished board up to share: a style to draw it in, and the
+/// picture. Opened from Share under a finished game; it no longer pops up by
+/// itself, and playing again lives under the board.
+struct ShareGameSheet: View {
     let state: GameState
     let configuration: GameConfiguration
-    /// The finished game, for "Recap Game": replay, race and commentary.
-    var recap: PlayedGame?
-    var onPlayAgain: () -> Void
-    var onChangeSetup: () -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var shareURL: URL?
-    @State private var recapping: PlayedGame?
 
     /// Every one of these is local to this sheet on purpose. Dressing a finished
     /// game up for sharing is about the picture, not about how the next game will
@@ -37,16 +30,10 @@ struct ResultSheet: View {
         theme: BoardTheme,
         cap: BridgeCap,
         initialStyle: BoardStyle,
-        highlightsWinningPath: Bool,
-        recap: PlayedGame? = nil,
-        onPlayAgain: @escaping () -> Void,
-        onChangeSetup: @escaping () -> Void
+        highlightsWinningPath: Bool
     ) {
         self.state = state
         self.configuration = configuration
-        self.recap = recap
-        self.onPlayAgain = onPlayAgain
-        self.onChangeSetup = onChangeSetup
         _style = State(initialValue: initialStyle)
         _theme = State(initialValue: theme)
         _cap = State(initialValue: cap)
@@ -67,11 +54,11 @@ struct ResultSheet: View {
                 .frame(maxWidth: 480)
                 .frame(maxWidth: .infinity)
             }
-            .navigationTitle(title)
+            .navigationTitle("Share Game")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .platformSubtitle(subtitle)
+            .platformSubtitle("\(title) · \(subtitle)")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
@@ -156,51 +143,17 @@ struct ResultSheet: View {
     }
 
     private var actions: some View {
-        actionButtons
-            .sheet(item: $recapping) { game in
-                ReplayView(record: game.record, names: game.names)
-            }
-    }
-
-    private var actionButtons: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
-                if let shareURL {
-                    ShareLink(item: shareURL) {
-                        Label("Share Image", systemImage: "square.and.arrow.up")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .prominentAction()
-                    .controlSize(.large)
+        Group {
+            if let shareURL {
+                ShareLink(item: shareURL) {
+                    Label("Share Image", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
                 }
-                if let recap {
-                    Button { recapping = recap } label: {
-                        Label("Recap Game", systemImage: "play.rectangle")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .prominentAction()
-                    .controlSize(.large)
-                }
+                .prominentAction()
+                .controlSize(.large)
+            } else {
+                ProgressView()
             }
-            Button {
-                dismiss()
-                onPlayAgain()
-            } label: {
-                Label("Play Again", systemImage: "arrow.clockwise")
-                    .frame(maxWidth: .infinity)
-            }
-            .secondaryAction()
-            .controlSize(.large)
-
-            Button {
-                dismiss()
-                onChangeSetup()
-            } label: {
-                Label("Change Setup", systemImage: "slider.horizontal.3")
-                    .frame(maxWidth: .infinity)
-            }
-            .secondaryAction()
-            .controlSize(.large)
         }
     }
 

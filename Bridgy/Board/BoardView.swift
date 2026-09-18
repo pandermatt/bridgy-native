@@ -25,10 +25,19 @@ struct BoardView: View {
                 style: settings.boardStyle,
                 cap: settings.bridgeCap,
                 guideDots: !session.configuration.isWatchOnly,
-                winningPath: settings.highlightsWinningPath ? session.winningPath : nil,
+                // The gold celebration marks the chain once the game is won.
+                winningPath: nil,
                 candidate: candidate(in: geometry),
-                hint: session.hintMove
+                hint: session.hintMove,
+                highlightsLastMove: !session.state.isOver
             )
+            .overlay {
+                // Keyed on the final move, so a new win celebrates afresh.
+                if session.state.winner != nil, settings.highlightsWinningPath {
+                    WinningPathCelebration(state: session.state, style: settings.boardStyle, cap: settings.bridgeCap)
+                        .id(session.state.moveCount)
+                }
+            }
             .contentShape(.rect)
             .gesture(
                 SpatialTapGesture()

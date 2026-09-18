@@ -132,6 +132,9 @@ struct ReplayView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var step: Double = 0
     @State private var playing = false
+    /// Down's chance after each move, as the judge sees it.
+    @State private var chances: [Int: Double] = [:]
+    @State private var judgeName: String?
 
     private var count: Int { Int(step.rounded()) }
 
@@ -148,6 +151,9 @@ struct ReplayView: View {
 
     var body: some View {
         NavigationStack {
+            // Scrolls: board, slider, two charts and commentary are more than
+            // an iPhone screen holds.
+            ScrollView {
             VStack(spacing: 12) {
                 BoardCanvas(
                     state: record.position(after: count),
@@ -169,12 +175,15 @@ struct ReplayView: View {
                 }
                 .frame(maxWidth: 520)
 
+                winChart.frame(maxWidth: 520)
                 raceChart.frame(maxWidth: 520)
 
                 GameCommentaryView(record: record, names: names)
                     .frame(maxWidth: 520, alignment: .leading)
             }
             .padding()
+            .frame(maxWidth: .infinity)
+            }
             .navigationTitle("\(names[record.down]) v \(names[record.across])")
             .replayTitleDisplay()
             .platformSubtitle(subtitle)
@@ -189,10 +198,81 @@ struct ReplayView: View {
                 }
             }
             .onAppear { step = Double(record.length) }
+            .task { await estimate() }
         }
         #if os(macOS)
         .frame(minWidth: 560, minHeight: 760)
         #endif
+    }
+
+    /// Who was winning after each move, by a trained agent's judgement,
+    /// following the slider.
+    @ViewBuilder
+    private var winChart: some View {
+        if chances.isEmpty {
+            if judgeName == nil, model.agents.agents.isEmpty {
+                Label("Train an agent to see who was winning after each move.", systemImage: "brain")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ProgressView().frame(height: 120)
+            }
+        } else {
+            let theme = model.settings.theme
+            let now = chances[count] ?? 0.5
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Win chance").font(.caption.weight(.semibold))
+                    Spacer()
+                    Text(verbatim: "\(Player.blue.displayName) \(Int((now * 100).rounded()))% · \(Player.red.displayName) \(Int(((1 - now) * 100).rounded()))%")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Chart {
+                    ForEach(chances.sorted { $0.key < $1.key }, id: \.key) { move, down in
+                        // Two areas, one per side: a single series takes one
+                        // colour, which painted Across's lead in Down's.
+                        AreaMark(x: .value("Move", move), yStart: .value("Even", 0.5), yEnd: .value("Down", max(down, 0.5)), series: .value("Side", "Down"))
+                            .foregroundStyle(theme.color(for: .blue).opacity(0.3))
+                        AreaMark(x: .value("Move", move), yStart: .value("Even", 0.5), yEnd: .value("Down", min(down, 0.5)), series: .value("Side", "Across"))
+                            .foregroundStyle(theme.color(for: .red).opacity(0.3))
+                        LineMark(x: .value("Move", move), y: .value("Down", down))
+                            .foregroundStyle(.secondary)
+                    }
+                    RuleMark(x: .value("Now", count)).foregroundStyle(.primary)
+                }
+                .chartYScale(domain: 0...1)
+                .chartYAxis {
+                    AxisMarks(values: [0, 0.5, 1]) { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            switch value.as(Double.self) {
+                            case 1?: Text(Player.blue.displayName)
+                            case 0?: Text(Player.red.displayName)
+                            default: Text("even")
+                            }
+                        }
+                    }
+                }
+                .frame(height: 110)
+                if let judgeName {
+                    Text("Judged by \(judgeName)").font(.caption2).foregroundStyle(.tertiary)
+                }
+            }
+        }
+    }
+
+    private func estimate() async {
+        guard let judge = model.agents.agents.last, let network = model.agents.network(for: judge) else { return }
+        judgeName = judge.name
+        let record = self.record
+        let computed = await Task.detached(priority: .utility) {
+            let board = Board(size: record.size)
+            let moves = record.moves.map { board.move(at: Int($0)) }
+            return WinEstimate.history(moves: moves, board: board, counts: Array(0...moves.count), network: network)
+        }.value
+        chances = computed
     }
 
     /// Moves each side still needed after every move — the race as it went.

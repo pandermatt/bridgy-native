@@ -78,7 +78,7 @@ enum ReportWriter {
                 "\(game.index + 1)", "\(game.size)",
                 analysis.names[game.down], analysis.names[game.across],
                 game.winner.displayName, "\(game.length)",
-                String(format: "%016llX", game.seed),
+                game.seed == 0 ? "" : String(format: "%016llX", game.seed),
                 game.moves.map(String.init).joined(separator: " ")
             ].joined(separator: ";"))
         }

@@ -211,6 +211,17 @@ struct SuggestMoveIntent: AppIntent {
     }
 }
 
+/// "Explain the rules of Bridgy" — Siri reads them out.
+struct ExplainRulesIntent: AppIntent {
+    static let title: LocalizedStringResource = "Explain the Rules"
+    static let description = IntentDescription("Explains how to play Bridgy.")
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        .result(dialog: IntentDialog(stringLiteral: Rules.spoken))
+    }
+}
+
 struct RunExperimentIntent: AppIntent {
     static let title: LocalizedStringResource = "Run an Experiment"
     static let description = IntentDescription("Runs a round robin or mirror matches with every built-in engine and opens it in the Lab.")
@@ -334,6 +345,15 @@ struct BridgyShortcuts: AppShortcutsProvider {
                 "What's my best move in \(.applicationName)"
             ],
             shortTitle: "Suggest a Move", systemImageName: "lightbulb"
+        )
+        AppShortcut(
+            intent: ExplainRulesIntent(),
+            phrases: [
+                "Explain the rules of \(.applicationName)",
+                "How do I play \(.applicationName)",
+                "Explain \(.applicationName) rules"
+            ],
+            shortTitle: "Explain the Rules", systemImageName: "questionmark.circle"
         )
         AppShortcut(
             intent: SummarizeExperimentIntent(),

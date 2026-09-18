@@ -1,3 +1,4 @@
+import AppIntents
 import BridgyEngine
 import SwiftUI
 
@@ -42,25 +43,19 @@ struct HowToPlayScreen: View {
                 } label: {
                     Label("What is Bridg-It?", systemImage: "sparkles")
                 }
+                #if os(iOS)
+                SiriTipView(intent: ExplainRulesIntent())
+                #else
+                Label("Ask Siri to explain the rules of Bridgy.", systemImage: "mic")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                #endif
             }
 
             Section {
-                rule("Two grids, interleaved", "square.grid.3x3", """
-                You own one grid of dots, your opponent the other. They overlap so that every \
-                bridge you could build crosses exactly one of theirs.
-                """)
-                rule("Join your own dots", "hand.tap", """
-                Tap the gap between two of your dots to bridge them. Taking a gap also denies it to \
-                your opponent, so every move builds and blocks at once.
-                """)
-                rule("Cross the board", "arrow.up.and.down", """
-                Down moves first and needs an unbroken chain from top to bottom. Across needs one \
-                from left to right.
-                """)
-                rule("Somebody always wins", "checkmark", """
-                There are no draws. When the board fills, exactly one player has crossed it — and it \
-                cannot be both, because their bridges would have to cross.
-                """)
+                ForEach(Rules.all) { item in
+                    rule(item.title, item.symbol, item.body)
+                }
             }
         }
         .navigationTitle("How to Play")
@@ -118,5 +113,39 @@ final class DemoBoard {
             }
             try? await Task.sleep(for: .milliseconds(650))
         }
+    }
+}
+
+/// The rules, once, for this screen and for Siri to read out.
+enum Rules {
+    struct Item: Identifiable {
+        var id: String { title }
+        let title: String
+        let symbol: String
+        let body: String
+    }
+
+    static let all: [Item] = [
+        Item(title: "Two grids, interleaved", symbol: "square.grid.3x3", body: """
+        You own one grid of dots, your opponent the other. They overlap so that every \
+        bridge you could build crosses exactly one of theirs.
+        """),
+        Item(title: "Join your own dots", symbol: "hand.tap", body: """
+        Tap the gap between two of your dots to bridge them. Taking a gap also denies it to \
+        your opponent, so every move builds and blocks at once.
+        """),
+        Item(title: "Cross the board", symbol: "arrow.up.and.down", body: """
+        Down moves first and needs an unbroken chain from top to bottom. Across needs one \
+        from left to right.
+        """),
+        Item(title: "Somebody always wins", symbol: "checkmark", body: """
+        There are no draws. When the board fills, exactly one player has crossed it — and it \
+        cannot be both, because their bridges would have to cross.
+        """)
+    ]
+
+    /// The rules as Siri says them: plain sentences, no headings.
+    static var spoken: String {
+        "Bridgy is Bridg-It, a game for two. " + all.map(\.body).joined(separator: " ")
     }
 }

@@ -9,6 +9,8 @@ struct GameScreen: View {
     @Binding var showingInspector: Bool
     /// The game just finished, as kept in the history, for the recap.
     @State private var finished: PlayedGame?
+    @State private var analysing: PlayedGame?
+    @State private var sharing = false
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
     #endif
@@ -40,23 +42,23 @@ struct GameScreen: View {
             .appEntityIdentifier(EntityIdentifier(for: GameEntity.self, identifier: session.id))
             .onAppear { session.begin() }
             .onDisappear { session.stop() }
-            .onChange(of: session.state.winner) { _, winner in
-                // Presented by item, so the sheet is built with the recorded
-                // game in hand; a Bool flag built it before `finished` was set.
+            // No sheet over the board when a game ends: the finished board is
+            // the payoff. The gold path draws in, and the actions sit under it.
+            .onChange(of: session.state.winner, initial: true) { _, winner in
                 guard winner != nil else { finished = nil; return }
                 finished = model.history.record(session.state, configuration: session.configuration)
             }
-            .sheet(item: $finished) { game in
-                ResultSheet(
+            .sheet(item: $analysing) { game in
+                ReplayView(record: game.record, names: game.names)
+            }
+            .sheet(isPresented: $sharing) {
+                ShareGameSheet(
                     state: session.state,
                     configuration: session.configuration,
                     theme: model.settings.theme,
                     cap: model.settings.bridgeCap,
                     initialStyle: model.settings.boardStyle,
-                    highlightsWinningPath: model.settings.highlightsWinningPath,
-                    recap: game,
-                    onPlayAgain: { session.restart() },
-                    onChangeSetup: { model.session = nil }
+                    highlightsWinningPath: model.settings.highlightsWinningPath
                 )
             }
     }
@@ -65,18 +67,60 @@ struct GameScreen: View {
     private func content(settings: Bindable<AppSettings>) -> some View {
         VStack(spacing: 16) {
             board
-            if model.settings.showHints, !session.state.isOver {
-                hintLine
+            if session.state.isOver, session.reviewIndex == nil {
+                gameOverBar
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else {
+                if model.settings.showHints, !session.state.isOver {
+                    hintLine
+                }
+                if isWatching {
+                    paceControls(settings: settings)
+                }
+                #if os(iOS)
+                if !isWatching, session.configuration.soloHumanPlayer != nil, model.settings.showsSiriHintTip {
+                    SiriTipView(intent: SuggestMoveIntent(), isVisible: settings.showsSiriHintTip)
+                }
+                #endif
             }
-            if isWatching {
-                paceControls(settings: settings)
-            }
-            #if os(iOS)
-            if !isWatching, session.configuration.soloHumanPlayer != nil, model.settings.showsSiriHintTip {
-                SiriTipView(intent: SuggestMoveIntent(), isVisible: settings.showsSiriHintTip)
-            }
-            #endif
         }
+        .animation(.smooth, value: session.state.isOver)
+    }
+
+    /// What to do with a finished game, in the order you'd want it: look at
+    /// how it went, show it off, go again.
+    private var gameOverBar: some View {
+        HStack(spacing: 10) {
+            Button {
+                analysing = finished
+            } label: {
+                Label("Analyse", systemImage: "chart.xyaxis.line")
+                    .frame(maxWidth: .infinity)
+            }
+            .prominentAction()
+            .disabled(finished == nil)
+
+            Button {
+                sharing = true
+            } label: {
+                Label("Share", systemImage: "square.and.arrow.up")
+                    .frame(maxWidth: .infinity)
+            }
+            .secondaryAction()
+
+            Button {
+                session.restart()
+            } label: {
+                Label("Play Again", systemImage: "arrow.clockwise")
+                    .frame(maxWidth: .infinity)
+            }
+            .secondaryAction()
+        }
+        // Icon over title, so "Analyse" and "Play Again" fit three abreast
+        // on a phone instead of breaking mid-word.
+        .labelStyle(StackedLabelStyle())
+        .controlSize(.large)
+        .font(.subheadline.weight(.semibold))
     }
 
     @ViewBuilder
@@ -123,6 +167,13 @@ struct GameScreen: View {
     /// Short enough to survive the toolbar on a phone; the goal moves to the
     /// subtitle, where "Your turn — top to…" used to be cut off.
     private var title: String {
+        if let winner = session.state.winner {
+            if session.configuration.soloHumanPlayer == winner { return "You win" }
+            if let human = session.configuration.soloHumanPlayer, human != winner {
+                return "\(session.configuration.seat(for: winner).displayName) wins"
+            }
+            return "\(winner.displayName) wins"
+        }
         if session.isHumanTurn, !session.configuration.isLocalTwoPlayer { return "Your turn" }
         return session.statusText
     }
@@ -369,4 +420,15 @@ extension View {
 extension String {
     /// "top to bottom" → "Top to bottom".
     var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+}
+
+/// Symbol above a one-line title, for a row of equal buttons.
+struct StackedLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(spacing: 4) {
+            configuration.icon.font(.title3)
+            configuration.title.lineLimit(1).minimumScaleFactor(0.8)
+        }
+        .padding(.vertical, 2)
+    }
 }
