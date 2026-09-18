@@ -62,7 +62,7 @@ struct AppRoot: View {
                 PlayTab()
             }
             Tab("Lab", systemImage: "flask", value: AppTab.lab) {
-                NavigationStack { TournamentScreen() }
+                LabScreen()
             }
             Tab("Rules", systemImage: "questionmark.circle", value: AppTab.rules) {
                 NavigationStack { HowToPlayScreen() }
@@ -98,7 +98,7 @@ struct AppRoot: View {
         } detail: {
             switch tab {
             case .play: PlayTab()
-            case .lab: NavigationStack { TournamentScreen() }
+            case .lab: LabScreen()
             case .agents: NavigationStack { TrainingScreen(run: model.training) }
             case .rules: NavigationStack { HowToPlayScreen() }
             case .settings: NavigationStack { SettingsScreen() }

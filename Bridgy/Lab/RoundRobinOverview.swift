@@ -1,12 +1,14 @@
 import BridgyEngine
-import BridgyTraining
 import Charts
 import SwiftUI
 
-/// Every engine against every other, plotted while it runs.
-struct TournamentScreen: View {
+/// A round robin's results: ratings as they converged, win rate by size and
+/// colour, the first-player advantage, and every pairing head to head.
+///
+/// Sections only; the caller puts them in its Form.
+struct RoundRobinOverview: View {
+    let analysis: TournamentAnalysis
     @Environment(AppModel.self) private var model
-    private var run: TournamentRun { model.tournament }
     @State private var focus: String?
     /// Which colour the size chart shows. Bridg-It is not colour-symmetric,
     /// so the combined figure hides the most important fact about Perfect.
@@ -14,128 +16,12 @@ struct TournamentScreen: View {
     @State private var selectedGames: Int?
 
     var body: some View {
-        Form {
-            setupSection
-            participantsSection
-            if let analysis = run.analysis, analysis.gamesPlayed > 0 {
-                ratingsSection(analysis)
-                sizeSection(analysis)
-                firstPlayerSection(analysis)
-                headToHeadSection(analysis)
-                exportSection
-            }
+        if analysis.gamesPlayed > 0 {
+            ratingsSection(analysis)
+            sizeSection(analysis)
+            firstPlayerSection(analysis)
+            headToHeadSection(analysis)
         }
-        // Was a bare List, which on macOS gave no grouped card at all: steppers
-        // stretched edge to edge with their arrows pinned right, and the run
-        // button fell back to a small default push button. This matches Settings
-        // and Setup, which both already use it.
-        .formStyle(.grouped)
-        .navigationTitle("Lab")
-    }
-
-    // MARK: - Setup
-
-    private var setupSection: some View {
-        @Bindable var run = run
-        return Section {
-            // Plain Text labels, not LabeledContent: that expands to fill, which
-            // is what pushed the stepper arrows to the far edge on macOS.
-            Group {
-                Stepper(
-                    "Smallest board: \(run.configuration.minimumSize)",
-                    value: $run.configuration.minimumSize,
-                    in: Board.minimumSize...12
-                )
-                Stepper(
-                    "Largest board: \(run.configuration.maximumSize)",
-                    value: $run.configuration.maximumSize,
-                    in: Board.minimumSize...12
-                )
-                Stepper(
-                    "Games per colour: \(run.configuration.gamesPerColour)",
-                    value: $run.configuration.gamesPerColour,
-                    in: 1...50
-                )
-            }
-            // Was on the last stepper alone, so the two board-size steppers
-            // stayed live while a tournament was running.
-            .disabled(run.isRunning)
-
-            if run.isRunning {
-                VStack(alignment: .leading, spacing: 6) {
-                    ProgressView(value: run.progress)
-                    Text("\(run.analysis?.gamesPlayed ?? 0) of \(run.scheduledGames) games")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                // The label expands, not the Button: on macOS a frame on the
-                // button widens its hit area but leaves the drawn control at its
-                // intrinsic width.
-                Button(role: .destructive) { run.stop() } label: {
-                    Text("Stop").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-            } else {
-                Button { run.start(store: model.agents) } label: {
-                    Text("Run \(run.totalGames(store: model.agents)) Games").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(run.fieldSize(store: model.agents) < 2)
-            }
-        } header: {
-            Text("Setup")
-        } footer: {
-            Text("Everyone in the field plays everyone else, in both colours, at each board size. Win rates carry 95% Wilson intervals, so small samples look small.")
-        }
-    }
-
-    // MARK: - Participants
-
-    private var participantsSection: some View {
-        Section {
-            ForEach(Difficulty.allCases) { level in
-                Toggle(isOn: Binding(
-                    get: { run.levels.contains(level) },
-                    set: { if $0 { run.levels.insert(level) } else { run.levels.remove(level) } }
-                )) {
-                    Label(level.displayName, systemImage: level.symbolName)
-                }
-            }
-            ForEach(model.agents.agents) { agent in
-                Toggle(isOn: Binding(
-                    get: { !run.benchedAgents.contains(agent.id) },
-                    set: { if $0 { run.benchedAgents.remove(agent.id) } else { run.benchedAgents.insert(agent.id) } }
-                )) {
-                    Label {
-                        VStack(alignment: .leading) {
-                            Text(agent.name)
-                            Text(agent.summary).font(.caption).foregroundStyle(.secondary)
-                        }
-                    } icon: {
-                        Image(systemName: "brain")
-                    }
-                }
-            }
-            NavigationLink {
-                TrainingScreen(run: model.training)
-            } label: {
-                LabeledContent {
-                    if model.training.isRunning {
-                        Text("Round \(model.training.round) of \(model.training.roundsPlanned)").monospacedDigit()
-                    }
-                } label: {
-                    Label("Train an Agent", systemImage: "brain.head.profile")
-                }
-            }
-        } header: {
-            Text("Participants")
-        } footer: {
-            Text("Agents you train join the field here. They search \(TrainingParameters().simulations) positions a move by default, so on large boards their games take a while.")
-        }
-        .disabled(run.isRunning)
     }
 
     // MARK: - Ratings
@@ -372,13 +258,4 @@ struct TournamentScreen: View {
         }
     }
 
-    private var exportSection: some View {
-        Section {
-            if let report = run.report {
-                ShareLink(item: report, preview: SharePreview("Tournament results")) {
-                    Label("Export CSV", systemImage: "square.and.arrow.up")
-                }
-            }
-        }
-    }
 }

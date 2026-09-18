@@ -12,6 +12,11 @@ public struct TournamentAnalysis: Sendable {
         public let wins: Int
         public let games: Int
 
+        public init(wins: Int, games: Int) {
+            self.wins = wins
+            self.games = games
+        }
+
         public var rate: Double { games > 0 ? Double(wins) / Double(games) : 0 }
         public var interval: ConfidenceInterval { Statistics.wilsonInterval(wins: wins, total: games) }
         public var isEmpty: Bool { games == 0 }
