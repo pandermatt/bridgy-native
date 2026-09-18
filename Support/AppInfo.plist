@@ -7,6 +7,17 @@
 		or Finder — which needs an exported type and a document type. Neither has
 		an INFOPLIST_KEY_ alias, so they live here and merge with the generated keys.
 	-->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>ch.pandermatt.bridgy</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>bridgy</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>

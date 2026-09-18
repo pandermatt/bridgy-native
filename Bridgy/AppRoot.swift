@@ -40,6 +40,10 @@ struct AppRoot: View {
         .environment(\.availableBoardSide, boardSide)
         // A .bridgyagent opened from Files, Finder, Mail or AirDrop.
         .onOpenURL { url in
+            if url.scheme == "bridgy" {
+                openLink(url)
+                return
+            }
             guard url.pathExtension == "bridgyagent" else { return }
             if (try? model.agents.importAgent(from: url)) != nil {
                 tabSelection.wrappedValue = usesSidebar ? .agents : .lab
@@ -159,6 +163,23 @@ struct AppRoot: View {
         .onChange(of: model.agents.agents.map(\.id)) { _, ids in
             if let id = sidebarAgent, !ids.contains(id) { sidebarAgent = nil }
         }
+    }
+
+    /// Links from the widget: carry on, start fresh, or try a puzzle.
+    private func openLink(_ url: URL) {
+        switch url.host() {
+        case "continue":
+            if model.session == nil { model.resumeGame() }
+        case "new":
+            model.parkSession()
+        case "puzzle":
+            model.parkSession()
+            model.openPuzzle = true
+        default:
+            break
+        }
+        sidebarAgent = nil
+        tab = .play
     }
 
     /// Selecting a tab goes through here rather than through a plain `$tab` so

@@ -49,6 +49,11 @@ struct GameScreen: View {
             .onDisappear { session.stop() }
             // No sheet over the board when a game ends: the finished board is
             // the payoff. The gold path draws in, and the actions sit under it.
+            #if os(iOS)
+            .onChange(of: session.state.moveCount, initial: true) { _, _ in
+                WidgetPublisher.publish(session, settings: model.settings)
+            }
+            #endif
             .onChange(of: session.state.winner, initial: true) { _, winner in
                 guard winner != nil else { finished = nil; return }
                 finished = model.history.record(session.state, configuration: session.configuration, source: session.gameID)

@@ -8,6 +8,7 @@ import WidgetKit
 struct BridgyWidgets: WidgetBundle {
     var body: some Widget {
         RunLiveActivity()
+        CurrentGameWidget()
     }
 }
 

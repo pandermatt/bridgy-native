@@ -25,6 +25,8 @@ final class AppModel {
 
     /// Set by an intent to bring a part of the app forward; the root clears it.
     var requestedTab: AppTab?
+    /// Set by the widget's puzzle link; the setup screen opens a puzzle and clears it.
+    var openPuzzle = false
     /// Set by an intent to open an experiment in the Lab; the Lab clears it.
     var openExperiment: UUID?
 

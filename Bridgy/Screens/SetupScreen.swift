@@ -141,6 +141,12 @@ struct SetupScreen: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Bridgy")
+        .navigationDestination(isPresented: Binding(
+            get: { model.openPuzzle },
+            set: { model.openPuzzle = $0 }
+        )) {
+            PuzzleScreen()
+        }
         .sheet(item: $replaying) { game in
             ReplayView(record: game.record, names: game.names)
         }
