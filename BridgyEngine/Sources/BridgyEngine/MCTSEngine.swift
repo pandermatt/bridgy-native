@@ -70,10 +70,30 @@ public struct MCTSEngine: Engine {
         // is not good enough for a move the player can see at a glance.
         if let decisive = decisiveMove(in: state, for: me) { return decisive }
 
+        let root = search(state, rng: &rng)
+
+        // The most-visited child is the robust choice; the highest-scoring one
+        // can be an outlier the search never got round to disproving.
+        return root.children.max { lhs, rhs in
+            lhs.visits == rhs.visits ? lhs.wins < rhs.wins : lhs.visits < rhs.visits
+        }?.move ?? state.legalMoves.randomElement(using: &rng)
+    }
+
+    /// The side to move's chance of winning, as the search sees it: how often
+    /// its most-played reply went on to win.
+    public func evaluate(_ state: GameState, rng: inout SeededRandomNumberGenerator) -> Double {
+        if let winner = state.winner { return winner == state.current ? 1 : 0 }
+        if decisiveMove(in: state, for: state.current).map({ state.wouldWin($0, for: state.current) }) == true { return 1 }
+        let root = search(state, rng: &rng)
+        guard let best = root.children.max(by: { $0.visits < $1.visits }), best.visits > 0 else { return 0.5 }
+        return best.wins / Double(best.visits)
+    }
+
+    private func search(_ state: GameState, rng: inout SeededRandomNumberGenerator) -> Node {
         let root = Node(
             move: nil,
             mover: nil,
-            toMove: me,
+            toMove: state.current,
             untried: state.legalMoveIndices.shuffled(using: &rng)
         )
 
@@ -90,12 +110,7 @@ public struct MCTSEngine: Engine {
             performed += 1
             runIteration(from: root, state: state, rng: &rng)
         }
-
-        // The most-visited child is the robust choice; the highest-scoring one
-        // can be an outlier the search never got round to disproving.
-        return root.children.max { lhs, rhs in
-            lhs.visits == rhs.visits ? lhs.wins < rhs.wins : lhs.visits < rhs.visits
-        }?.move ?? state.legalMoves.randomElement(using: &rng)
+        return root
     }
 
     /// A move that wins immediately, or that stops the opponent winning immediately.

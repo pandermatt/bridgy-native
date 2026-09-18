@@ -116,9 +116,9 @@ struct WatchPace: Hashable, Codable, Sendable {
 
     var rateDescription: String {
         if isInstant { return "Instant" }
-        return movesPerSecond < 1
-            ? String(format: "%.1f moves per second", movesPerSecond)
-            : String(format: "%.0f moves per second", movesPerSecond)
+        if movesPerSecond < 1 { return String(format: "%.1f moves per second", movesPerSecond) }
+        let rounded = Int(movesPerSecond.rounded())
+        return rounded == 1 ? "1 move per second" : "\(rounded) moves per second"
     }
 
     /// The slider works in log space so the slow end stays adjustable — the

@@ -72,7 +72,8 @@ final class CloudSync {
     /// container without it is a crash, not an error.
     static var isAvailable: Bool {
         #if os(iOS) || os(visionOS)
-        true
+        // Without the iCloud entitlement CloudKit traps on first use.
+        BridgyBuild.hasPaidEntitlements
         #else
         false
         #endif

@@ -134,7 +134,6 @@ struct ReplayView: View {
     @State private var playing = false
     /// Down's chance after each move, as the judge sees it.
     @State private var chances: [Int: Double] = [:]
-    @State private var judgeName: String?
 
     private var count: Int { Int(step.rounded()) }
 
@@ -208,22 +207,16 @@ struct ReplayView: View {
         #endif
     }
 
-    /// Who was winning after each move, by a trained agent's judgement,
-    /// following the slider.
+    /// Who was winning after each move, following the slider, with the
+    /// moves that swung it marked.
     @ViewBuilder
     private var winChart: some View {
         if chances.isEmpty {
-            if judgeName == nil, model.agents.agents.isEmpty {
-                Label("Train an agent to see who was winning after each move.", systemImage: "brain")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                ProgressView().frame(height: 120)
-            }
+            ProgressView().frame(height: 120)
         } else {
             let theme = model.settings.theme
             let now = chances[count] ?? 0.5
+            let turns = PositionJudge.turningPoints(in: chances)
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("Win chance").font(.caption.weight(.semibold))
@@ -243,6 +236,12 @@ struct ReplayView: View {
                         LineMark(x: .value("Move", move), y: .value("Down", down))
                             .foregroundStyle(.secondary)
                     }
+                    ForEach(turns, id: \.move) { turn in
+                        PointMark(x: .value("Move", turn.move), y: .value("Down", turn.after))
+                            .symbol(.circle)
+                            .symbolSize(60)
+                            .foregroundStyle(theme.color(for: turn.mover))
+                    }
                     RuleMark(x: .value("Now", count)).foregroundStyle(.primary)
                 }
                 .chartYScale(domain: 0...1)
@@ -259,23 +258,47 @@ struct ReplayView: View {
                     }
                 }
                 .frame(height: 110)
-                if let judgeName {
-                    Text("Judged by \(judgeName)").font(.caption2).foregroundStyle(.tertiary)
+                ForEach(turns, id: \.move) { turn in
+                    Button {
+                        playing = false
+                        step = Double(turn.move)
+                    } label: {
+                        turningPointRow(turn)
+                    }
+                    .buttonStyle(.plain)
                 }
+                Text("Played out thousands of times from every position; exact once a win is forced.")
+                    .font(.caption2).foregroundStyle(.tertiary)
             }
         }
     }
 
+    /// "Move 14 · Across threw it away: Down 35% → 81%". Tapping it jumps there.
+    private func turningPointRow(_ turn: PositionJudge.TurningPoint) -> some View {
+        let name = names[turn.mover == .blue ? record.down : record.across]
+        let verdict = turn.swingForMover > 0 ? "turned it" : "let it slip"
+        let before = Int((turn.before * 100).rounded()), after = Int((turn.after * 100).rounded())
+        return HStack(spacing: 8) {
+            Circle().fill(model.settings.theme.color(for: turn.mover)).frame(width: 8, height: 8)
+            Text("Move \(turn.move)").monospacedDigit().foregroundStyle(.secondary)
+            Text("\(name) \(verdict)")
+            Spacer()
+            Text(verbatim: "\(Player.blue.displayName) \(before)% → \(after)%")
+                .monospacedDigit().foregroundStyle(.secondary)
+        }
+        .font(.caption)
+        .contentShape(.rect)
+    }
+
     private func estimate() async {
-        guard let judge = model.agents.agents.last, let network = model.agents.network(for: judge) else { return }
-        judgeName = judge.name
         let record = self.record
         let computed = await Task.detached(priority: .utility) {
             let board = Board(size: record.size)
             let moves = record.moves.map { board.move(at: Int($0)) }
-            return WinEstimate.history(moves: moves, board: board, counts: Array(0...moves.count), network: network)
+            let counts = board.size <= 15 ? Array(0...moves.count) : [moves.count]
+            return PositionJudge.history(moves: moves, board: board, counts: counts)
         }.value
-        chances = computed
+        chances = PositionJudge.smoothed(computed)
     }
 
     /// Moves each side still needed after every move — the race as it went.

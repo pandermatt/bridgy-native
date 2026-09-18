@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- What a free (Personal Team) account can sign. iCloud and SharePlay
+	     need the paid program: see Bridgy-iOS-Paid.entitlements and
+	     BRIDGY_ENTITLEMENTS in project.yml. -->
+	<!-- Shared with the widget, which shows the game in progress. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.ch.pandermatt.bridgy</string>
+	</array>
+	<key>com.apple.developer.game-center</key>
+	<true/>
+</dict>
+</plist>

@@ -3,7 +3,7 @@ import Foundation
 
 /// Down's chance of winning, as a trained agent's network judges a position.
 ///
-/// Shared by the game inspector and the replay, so both show the same numbers.
+/// The inspector offers this beside the default judge, `PositionJudge`.
 enum WinEstimate {
 
     /// Down's chance in one position: certain once the game is decided,

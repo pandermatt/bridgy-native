@@ -35,43 +35,63 @@ struct GameScreen: View {
 
     var body: some View {
         @Bindable var settings = model.settings
-        return content(settings: $settings)
-            .padding(.horizontal)
-            .padding(.top, 8)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            .navigationTitle(title)
-            .platformSubtitle(subtitle)
-            .toolbar { actions(settings: $settings) }
-            .gameScreenTitleDisplayMode()
-            .modifier(GameFeedback(session: session, settings: model.settings, isWatching: isWatching))
-            // Siri can see which game is on screen, so "what should I play here?" has an answer.
-            .appEntityIdentifier(EntityIdentifier(for: GameEntity.self, identifier: session.id))
-            .onAppear { session.begin() }
-            .onDisappear { session.stop() }
-            // No sheet over the board when a game ends: the finished board is
-            // the payoff. The gold path draws in, and the actions sit under it.
-            #if os(iOS)
-            .onChange(of: session.state.moveCount, initial: true) { _, _ in
-                WidgetPublisher.publish(session, settings: model.settings)
-            }
-            #endif
-            .onChange(of: session.state.winner, initial: true) { _, winner in
-                guard winner != nil else { finished = nil; return }
-                finished = model.history.record(session.state, configuration: session.configuration, source: session.gameID)
-            }
-            .sheet(item: $analysing) { game in
-                ReplayView(record: game.record, names: game.names)
-            }
-            .sheet(isPresented: $sharing) {
-                ShareGameSheet(
-                    state: session.state,
-                    configuration: session.configuration,
-                    theme: model.settings.theme,
-                    cap: model.settings.bridgeCap,
-                    initialStyle: model.settings.boardStyle,
-                    highlightsWinningPath: model.settings.highlightsWinningPath
-                )
-            }
+        // Everything that changes with each move is read inside `Isolated`,
+        // so a move redraws that and not this body. This body builds the
+        // toolbar, and rebuilding it closed any open submenu — Board Style
+        // couldn't be picked while two computers played.
+        return Isolated {
+            content(settings: $settings)
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                .navigationTitle(title)
+                .platformSubtitle(subtitle)
+                .modifier(GameFeedback(session: session, settings: model.settings, isWatching: isWatching))
+                // Siri can see which game is on screen, so "what should I play here?" has an answer.
+                .appEntityIdentifier(EntityIdentifier(for: GameEntity.self, identifier: session.id))
+                .onAppear {
+                    session.begin()
+                    keepsScreenAwake(true)
+                }
+                .onDisappear {
+                    session.stop()
+                    keepsScreenAwake(false)
+                }
+                // No sheet over the board when a game ends: the finished board is
+                // the payoff. The gold path draws in, and the actions sit under it.
+                #if os(iOS)
+                .onChange(of: session.state.moveCount, initial: true) { _, _ in
+                    WidgetPublisher.publish(session, settings: model.settings)
+                }
+                #endif
+                .onChange(of: session.state.winner, initial: true) { _, winner in
+                    guard winner != nil else { finished = nil; return }
+                    finished = model.history.record(session.state, configuration: session.configuration, source: session.gameID)
+                }
+        }
+        .toolbar { actions(settings: $settings) }
+        .gameScreenTitleDisplayMode()
+        .sheet(item: $analysing) { game in
+            ReplayView(record: game.record, names: game.names)
+        }
+        .sheet(isPresented: $sharing) {
+            ShareGameSheet(
+                state: session.state,
+                configuration: session.configuration,
+                theme: model.settings.theme,
+                cap: model.settings.bridgeCap,
+                initialStyle: model.settings.boardStyle,
+                highlightsWinningPath: model.settings.highlightsWinningPath
+            )
+        }
+    }
+
+    /// A game is something you look at without touching — the other side
+    /// thinking, or two computers playing — so the phone shouldn't lock on it.
+    private func keepsScreenAwake(_ awake: Bool) {
+        #if os(iOS)
+        UIApplication.shared.isIdleTimerDisabled = awake
+        #endif
     }
 
     @ViewBuilder
@@ -252,20 +272,7 @@ struct GameScreen: View {
                     .font(.subheadline.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
-            Slider(
-                value: Binding(
-                    get: { settings.wrappedValue.watchPace.sliderPosition },
-                    set: { settings.wrappedValue.watchPace.sliderPosition = $0 }
-                ),
-                in: WatchPace.sliderRange
-            ) {
-                Text("Pace")
-            } minimumValueLabel: {
-                Image(systemName: "tortoise")
-            } maximumValueLabel: {
-                Image(systemName: "hare")
-            }
-            .labelsHidden()
+            PaceSlider(pace: settings.watchPace)
 
             Toggle("Let engines think fully", isOn: settings.watchPace.allowsFullThinking)
                 .font(.subheadline)
@@ -481,4 +488,11 @@ private extension View {
         glassEffect(.regular.interactive(), in: .capsule)
         #endif
     }
+}
+
+/// Runs its content in its own body, so what the content reads — the
+/// position, the move count — invalidates this view alone, not the parent.
+private struct Isolated<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+    var body: some View { content() }
 }

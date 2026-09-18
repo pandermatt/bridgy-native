@@ -16,6 +16,7 @@ struct GameInspector: View {
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
     #endif
+    /// A trained agent judging instead of the search; nil is the search.
     @State private var judgeID: UUID?
     /// Down's chance of winning after each number of moves, as the judge sees it.
     @State private var estimates: [Int: Double] = [:]
@@ -25,8 +26,13 @@ struct GameInspector: View {
     @State private var estimatedBy: UUID?
 
     private var state: GameState { session.state }
+    /// What the chart and bar show. The search's readings are smoothed; an
+    /// agent's network has no move-by-move bias to take out.
+    private var shown: [Int: Double] {
+        judge == nil ? PositionJudge.smoothed(estimates) : estimates
+    }
     private var judge: SavedAgent? {
-        model.agents.agents.first { $0.id == judgeID } ?? model.agents.agents.last
+        model.agents.agents.first { $0.id == judgeID }
     }
 
     var body: some View {
@@ -78,27 +84,25 @@ struct GameInspector: View {
     @ViewBuilder
     private var estimateSection: some View {
         Section {
-            if let judge {
-                if model.agents.agents.count > 1 {
-                    Picker("Judge", selection: Binding(get: { judge.id }, set: { judgeID = $0 })) {
-                        ForEach(model.agents.agents) { Text($0.name).tag($0.id) }
-                    }
+            // Your own agents can judge too — interesting to compare with
+            // the search, though a lightly trained one sits near 50%.
+            if !model.agents.agents.isEmpty {
+                Picker("Judge", selection: $judgeID) {
+                    Text("Search").tag(UUID?.none)
+                    ForEach(model.agents.agents) { Text($0.name).tag(Optional($0.id)) }
                 }
-                if let current = estimates[reviewIndex ?? state.moveCount] {
-                    estimateBar(current)
-                } else {
-                    ProgressView().frame(maxWidth: .infinity)
-                }
-                if estimates.count > 1 {
-                    estimateChart
-                }
-                if judge.parameters.boardSize != state.board.size {
-                    Text("\(judge.name) trained on \(judge.parameters.boardSize)×\(judge.parameters.boardSize), so read this loosely on a \(state.board.size)×\(state.board.size) board.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+            }
+            if let current = shown[reviewIndex ?? state.moveCount] {
+                estimateBar(current)
             } else {
-                Text("Train an agent in Agents and it will judge every position here.")
-                    .font(.callout).foregroundStyle(.secondary)
+                ProgressView().frame(maxWidth: .infinity)
+            }
+            if estimates.count > 1 {
+                estimateChart
+            }
+            if let judge, judge.parameters.boardSize != state.board.size {
+                Text("\(judge.name) trained on \(judge.parameters.boardSize)×\(judge.parameters.boardSize), so read this loosely on a \(state.board.size)×\(state.board.size) board.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         } header: {
             Text("Win estimate")
@@ -129,7 +133,7 @@ struct GameInspector: View {
 
     private var estimateChart: some View {
         Chart {
-            ForEach(estimates.sorted { $0.key < $1.key }, id: \.key) { move, down in
+            ForEach(shown.sorted { $0.key < $1.key }, id: \.key) { move, down in
                 // Two areas, one per side: a single series takes one
                 // colour, which painted Across's lead in Down's.
                 AreaMark(x: .value("Move", move), yStart: .value("Even", 0.5), yEnd: .value("Down", max(down, 0.5)), series: .value("Side", "Down"))
@@ -178,7 +182,7 @@ struct GameInspector: View {
                             .frame(width: 16)
                         Text(Self.place(of: move, on: state.board)).monospacedDigit()
                         Spacer()
-                        if let down = estimates[index + 1] {
+                        if let down = shown[index + 1] {
                             Text("\(Int((down * 100).rounded()))%")
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(.secondary)
@@ -227,22 +231,23 @@ struct GameInspector: View {
     /// big boards judge only the latest position; a full history there would
     /// cost more than it shows.
     private func refreshEstimates() async {
-        guard let judge, let network = model.agents.network(for: judge) else {
-            estimates = [:]
-            return
-        }
+        let network = judge.flatMap { model.agents.network(for: $0) }
         let moves = state.moves
         let board = state.board
-        if estimatedBy != judge.id || !moves.starts(with: estimatedMoves) {
+        if estimatedBy != judge?.id || !moves.starts(with: estimatedMoves) {
             estimates = [:]
-            estimatedBy = judge.id
+            estimatedBy = judge?.id
         }
         estimatedMoves = moves
         let wanted = board.size <= 15 ? Array(0...moves.count) : [moves.count]
         let missing = wanted.filter { estimates[$0] == nil }
         guard !missing.isEmpty else { return }
         let computed = await Task.detached(priority: .utility) {
-            WinEstimate.history(moves: moves, board: board, counts: missing, network: network)
+            if let network {
+                WinEstimate.history(moves: moves, board: board, counts: missing, network: network)
+            } else {
+                PositionJudge.history(moves: moves, board: board, counts: missing)
+            }
         }.value
         estimates.merge(computed) { _, new in new }
     }

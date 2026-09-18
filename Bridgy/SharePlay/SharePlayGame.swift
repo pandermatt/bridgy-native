@@ -62,7 +62,7 @@ final class SharePlayGame {
     /// Waits for sessions for the life of the app: one starts here, or a
     /// friend on the call starts one and this device is invited.
     func listen() {
-        guard listening == nil else { return }
+        guard listening == nil, BridgyBuild.hasPaidEntitlements else { return }
         listening = Task { [weak self] in
             for await session in BridgyActivity.sessions() {
                 self?.join(session)

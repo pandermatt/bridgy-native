@@ -69,8 +69,13 @@ targets:
         INFOPLIST_FILE[sdk=iphone*]: Support/AppInfo.plist
         INFOPLIST_FILE[sdk=macosx*]: Support/AppInfo.plist
         INFOPLIST_KEY_NSSupportsLiveActivities[sdk=iphone*]: YES
-        CODE_SIGN_ENTITLEMENTS[sdk=iphone*]: Support/Bridgy-iOS.entitlements
-        CODE_SIGN_ENTITLEMENTS[sdk=xr*]: Support/Bridgy-visionOS.entitlements
+        # Free: what a Personal Team can sign (Game Center, the widget's App
+        # Group). Paid adds iCloud sync and SharePlay, which a free account
+        # can't provision — asking for them fails the whole profile. Switch
+        # to Paid once the team is in the Apple Developer Program.
+        BRIDGY_ENTITLEMENTS: Free
+        CODE_SIGN_ENTITLEMENTS[sdk=iphone*]: Support/Bridgy-iOS-$(BRIDGY_ENTITLEMENTS).entitlements
+        CODE_SIGN_ENTITLEMENTS[sdk=xr*]: Support/Bridgy-visionOS-$(BRIDGY_ENTITLEMENTS).entitlements
         # Opened agent files are copied in, not edited where they lie. macOS
         # refuses NO here, so it is set for iPhone and iPad only.
         INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace[sdk=iphone*]: NO

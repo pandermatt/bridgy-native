@@ -56,5 +56,8 @@
 	</array>
 	<key>NSSupportsGroupActivities</key>
 	<true/>
+	<!-- Free or Paid: which entitlements this build was signed with. -->
+	<key>BridgyEntitlements</key>
+	<string>$(BRIDGY_ENTITLEMENTS)</string>
 </dict>
 </plist>

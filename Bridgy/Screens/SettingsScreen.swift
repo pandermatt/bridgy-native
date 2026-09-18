@@ -115,12 +115,14 @@ struct SettingsScreen: View {
 
             VictorySongSection(settings: settings)
 
+            if BridgyBuild.hasPaidEntitlements {
             Section {
                 TextField("Your Name", text: $settings.sharePlayName)
             } header: {
                 Text("SharePlay")
             } footer: {
                 Text("What a friend sees you called when you play over FaceTime.")
+            }
             }
 
             Section {

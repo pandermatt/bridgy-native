@@ -117,7 +117,7 @@ struct SetupScreen: View {
                 .listRowBackground(Color.clear)
             }
 
-            if !configuration.isWatchOnly {
+            if !configuration.isWatchOnly, BridgyBuild.hasPaidEntitlements {
                 SharePlaySection(size: configuration.size)
             }
 
@@ -314,17 +314,7 @@ struct WatchPaceControls: View {
         LabeledContent("Pace") {
             Text(pace.rateDescription).monospacedDigit()
         }
-        Slider(
-            value: Binding(get: { pace.sliderPosition }, set: { pace.sliderPosition = $0 }),
-            in: WatchPace.sliderRange
-        ) {
-            Text("Pace")
-        } minimumValueLabel: {
-            Image(systemName: "tortoise")
-        } maximumValueLabel: {
-            Image(systemName: "hare")
-        }
-        .labelsHidden()
+        PaceSlider(pace: $pace)
 
         Toggle("Let engines think fully", isOn: $pace.allowsFullThinking)
         Text(
@@ -334,5 +324,40 @@ struct WatchPaceControls: View {
         )
         .font(.footnote)
         .foregroundStyle(.secondary)
+    }
+}
+
+/// The pace slider, which follows your finger rather than the stored rate.
+///
+/// Between 30 moves a second and Instant the rate doesn't change — it is
+/// clamped at 30 until the thumb passes the midpoint, then jumps to Instant.
+/// Reading the thumb back from the rate snapped it to one end or the other
+/// on every tick of the drag, and each snap was a haptic bump.
+struct PaceSlider: View {
+    @Binding var pace: WatchPace
+    @State private var dragging: Double?
+
+    var body: some View {
+        Slider(
+            value: Binding(
+                get: { dragging ?? pace.sliderPosition },
+                set: { position in
+                    dragging = position
+                    let updated = { var p = pace; p.sliderPosition = position; return p }()
+                    // Only write a real change: every write reaches the game.
+                    if updated != pace { pace = updated }
+                }
+            ),
+            in: WatchPace.sliderRange
+        ) {
+            Text("Pace")
+        } minimumValueLabel: {
+            Image(systemName: "tortoise")
+        } maximumValueLabel: {
+            Image(systemName: "hare")
+        } onEditingChanged: { editing in
+            if !editing { dragging = nil }
+        }
+        .labelsHidden()
     }
 }
