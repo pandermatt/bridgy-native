@@ -23,6 +23,11 @@ struct StatsScreen: View {
                     opponents(stats)
                     if stats.bySize.count > 1 { sizes(stats) }
                     records(stats)
+                    if model.settings.puzzlesTried > 0 {
+                        Section("Puzzles") {
+                            LabeledContent("Solved", value: "\(model.settings.puzzlesSolved) of \(model.settings.puzzlesTried)")
+                        }
+                    }
                     allGames(stats)
                 }
                 .formStyle(.grouped)

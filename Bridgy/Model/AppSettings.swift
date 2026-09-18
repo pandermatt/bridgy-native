@@ -21,6 +21,15 @@ final class AppSettings {
     /// Offer a song with a short Apple Music preview after a win. Off until
     /// asked for: it needs Apple Music access.
     var suggestsVictorySong: Bool { didSet { store(suggestsVictorySong, "suggestsVictorySong") } }
+    /// Puzzles finished, and how many of them were solved.
+    var puzzlesSolved: Int { didSet { store(puzzlesSolved, "puzzlesSolved") } }
+    var puzzlesTried: Int { didSet { store(puzzlesTried, "puzzlesTried") } }
+
+    func recordPuzzle(solved: Bool) {
+        puzzlesTried += 1
+        if solved { puzzlesSolved += 1 }
+    }
+
     /// Apple Music catalogue id of the song offered.
     var victorySongID: String { didSet { store(victorySongID, "victorySongID") } }
 
@@ -62,6 +71,8 @@ final class AppSettings {
         highlightsWinningPath = defaults.object(forKey: "highlightsWinningPath") as? Bool ?? true
         hasSeenWelcome = defaults.object(forKey: "hasSeenWelcome") as? Bool ?? false
         showsSiriHintTip = defaults.object(forKey: "showsSiriHintTip") as? Bool ?? true
+        puzzlesSolved = defaults.integer(forKey: "puzzlesSolved")
+        puzzlesTried = defaults.integer(forKey: "puzzlesTried")
         suggestsVictorySong = defaults.object(forKey: "suggestsVictorySong") as? Bool ?? false
         // "Lemonade" by SOPHIE.
         victorySongID = defaults.string(forKey: "victorySongID") ?? "1528287372"

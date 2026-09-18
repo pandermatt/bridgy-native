@@ -115,6 +115,22 @@ struct SetupScreen: View {
                 .listRowBackground(Color.clear)
             }
 
+            Section {
+                NavigationLink {
+                    PuzzleScreen()
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Solve a Puzzle")
+                            Text("A random position with a forced win. Find it.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "puzzlepiece.extension")
+                    }
+                }
+            }
+
             if !model.history.games.isEmpty {
                 recentGamesSection
             }
