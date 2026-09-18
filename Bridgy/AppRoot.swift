@@ -36,6 +36,11 @@ struct AppRoot: View {
             boardSide = Self.boardSide(in: size, sidebar: usesSidebar)
         }
         .environment(\.availableBoardSide, boardSide)
+        .onChange(of: model.requestedTab) { _, requested in
+            guard let requested else { return }
+            tabSelection.wrappedValue = requested
+            model.requestedTab = nil
+        }
         .welcomeCover(isPresented: $showingWelcome) {
             model.settings.hasSeenWelcome = true
             showingWelcome = false

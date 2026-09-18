@@ -1,3 +1,4 @@
+import AppIntents
 import BridgyEngine
 import SwiftUI
 
@@ -50,6 +51,12 @@ struct FindingsSections: View {
             if let error {
                 Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.red)
             }
+            #if os(iOS)
+            SiriTipView(intent: SummarizeExperimentIntent())
+            #else
+            Label("Ask Siri about this experiment — it can read the report on screen.", systemImage: "mic")
+                .font(.caption).foregroundStyle(.secondary)
+            #endif
         } header: {
             Text("Findings")
         } footer: {

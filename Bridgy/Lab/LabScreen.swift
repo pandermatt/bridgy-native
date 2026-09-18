@@ -58,6 +58,11 @@ struct LabScreen: View {
                     }
                 }
             }
+            .onChange(of: model.openExperiment, initial: true) { _, id in
+                guard let id else { return }
+                path = [id]
+                model.openExperiment = nil
+            }
             .sheet(item: $drafting) { kind in
                 NewExperimentSheet(kind: kind) { experiment in
                     library.save(experiment)

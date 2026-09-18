@@ -1,9 +1,17 @@
+import AppIntents
 import BridgyEngine
 import SwiftUI
 
 @main
 struct BridgyApp: App {
-    @State private var model = AppModel()
+    @State private var model: AppModel
+
+    init() {
+        let model = AppModel()
+        _model = State(initialValue: model)
+        // Siri, Shortcuts and the on-screen entities reach the app through this.
+        AppDependencyManager.shared.add(dependency: model)
+    }
 
     var body: some Scene {
         WindowGroup {

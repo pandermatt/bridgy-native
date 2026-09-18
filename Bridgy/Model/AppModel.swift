@@ -19,6 +19,11 @@ final class AppModel {
     let library = ExperimentLibrary()
     let runner = ExperimentRunner()
 
+    /// Set by an intent to bring a part of the app forward; the root clears it.
+    var requestedTab: AppTab?
+    /// Set by an intent to open an experiment in the Lab; the Lab clears it.
+    var openExperiment: UUID?
+
     /// The live game, if one is on screen.
     var session: GameSession?
     /// A saved game that can be picked up again.

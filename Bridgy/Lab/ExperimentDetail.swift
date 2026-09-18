@@ -1,6 +1,28 @@
+import AppIntents
 import BridgyEngine
 import Charts
+import CoreTransferable
 import SwiftUI
+import UniformTypeIdentifiers
+
+/// A report or the raw games, built only when shared.
+struct ExperimentReportFile: Transferable {
+    enum Format { case markdown, csv }
+    let analysis: ExperimentAnalysis
+    let format: Format
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .plainText) { file in
+            let name = file.analysis.experiment.name.replacingOccurrences(of: "/", with: "-")
+            let url = URL.temporaryDirectory.appendingPathComponent(
+                file.format == .markdown ? "\(name).md" : "\(name) games.csv"
+            )
+            let text = file.format == .markdown ? ReportWriter.markdown(file.analysis) : ReportWriter.csv(file.analysis)
+            try Data(text.utf8).write(to: url, options: .atomic)
+            return SentTransferredFile(url)
+        }
+    }
+}
 
 /// One experiment: its question, its results as they come in, every game, and
 /// the statistics that say how far to trust them.
@@ -23,7 +45,10 @@ struct ExperimentDetail: View {
             let analysis = ExperimentAnalysis(experiment: experiment, games: games)
             content(experiment, analysis: analysis)
                 .navigationTitle(experiment.name)
-                .toolbar { toolbar(experiment) }
+                .toolbar { toolbar(experiment, analysis: analysis) }
+                // Tells Siri which experiment is on screen, so "summarise
+                // this" gets this report.
+                .appEntityIdentifier(EntityIdentifier(for: ExperimentEntity.self, identifier: id))
         } else {
             ContentUnavailableView("Experiment deleted", systemImage: "flask")
         }
@@ -95,7 +120,22 @@ struct ExperimentDetail: View {
     }
 
     @ToolbarContentBuilder
-    private func toolbar(_ experiment: Experiment) -> some ToolbarContent {
+    private func toolbar(_ experiment: Experiment, analysis: ExperimentAnalysis) -> some ToolbarContent {
+        ToolbarItem(placement: .secondaryAction) {
+            Menu {
+                ShareLink(item: ExperimentReportFile(analysis: analysis, format: .markdown),
+                          preview: SharePreview("\(experiment.name) report")) {
+                    Label("Report (Markdown)", systemImage: "doc.richtext")
+                }
+                ShareLink(item: ExperimentReportFile(analysis: analysis, format: .csv),
+                          preview: SharePreview("\(experiment.name) games")) {
+                    Label("All Games (CSV)", systemImage: "tablecells")
+                }
+            } label: {
+                Label("Export", systemImage: "square.and.arrow.up")
+            }
+            .disabled(analysis.games.isEmpty)
+        }
         ToolbarItem(placement: .primaryAction) {
             if isRunning {
                 Button(role: .destructive) { model.runner.stop(library: model.library) } label: {
