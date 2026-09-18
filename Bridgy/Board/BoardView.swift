@@ -25,15 +25,16 @@ struct BoardView: View {
                 style: settings.boardStyle,
                 cap: settings.bridgeCap,
                 guideDots: !session.configuration.isWatchOnly,
-                // The gold celebration marks the chain once the game is won.
-                winningPath: nil,
+                // Gold for your win (or any win you're watching); a loss shows
+                // the winner's chain as it is.
+                winningPath: celebrates ? nil : (settings.highlightsWinningPath ? session.winningPath : nil),
                 candidate: candidate(in: geometry),
                 hint: session.hintMove,
                 highlightsLastMove: !session.state.isOver
             )
             .overlay {
                 // Keyed on the final move, so a new win celebrates afresh.
-                if session.state.winner != nil, settings.highlightsWinningPath {
+                if celebrates, settings.highlightsWinningPath {
                     WinningPathCelebration(state: session.state, style: settings.boardStyle, cap: settings.bridgeCap)
                         .id(session.state.moveCount)
                 }
@@ -64,6 +65,12 @@ struct BoardView: View {
             .accessibilityValue(accessibilityValue)
         }
         .aspectRatio(1, contentMode: .fit)
+    }
+
+    private var celebrates: Bool {
+        guard let winner = session.state.winner else { return false }
+        guard let me = session.configuration.soloHumanPlayer else { return true }
+        return me == winner
     }
 
     /// Ghosts the cell the pointer is over, so a click is never a guess.

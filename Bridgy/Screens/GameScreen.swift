@@ -2,6 +2,7 @@ import AppIntents
 import BridgyEngine
 import MusicKit
 import SwiftUI
+import TipKit
 
 /// The board, on the system background, with everything else in system chrome.
 struct GameScreen: View {
@@ -50,7 +51,7 @@ struct GameScreen: View {
             // the payoff. The gold path draws in, and the actions sit under it.
             .onChange(of: session.state.winner, initial: true) { _, winner in
                 guard winner != nil else { finished = nil; return }
-                finished = model.history.record(session.state, configuration: session.configuration)
+                finished = model.history.record(session.state, configuration: session.configuration, source: session.gameID)
             }
             .sheet(item: $analysing) { game in
                 ReplayView(record: game.record, names: game.names)
@@ -87,6 +88,11 @@ struct GameScreen: View {
                 if isWatching {
                     paceControls(settings: settings)
                 }
+                // Inline rather than a popover: popovers from toolbar buttons
+                // don't show in the iOS 26 toolbar.
+                if session.isHumanTurn, session.configuration.soloHumanPlayer != nil {
+                    TipView(HintTip())
+                }
                 #if os(iOS)
                 if !isWatching, session.configuration.soloHumanPlayer != nil, model.settings.showsSiriHintTip {
                     SiriTipView(intent: SuggestMoveIntent(), isVisible: settings.showsSiriHintTip)
@@ -103,8 +109,12 @@ struct GameScreen: View {
     /// bordered buttons competing with the board.
     private var gameOverBar: some View {
         HStack(spacing: 0) {
-            gameOverButton("Analyse", "chart.xyaxis.line", prominent: true) { analysing = finished }
-                .disabled(finished == nil)
+            gameOverButton("Analyse", "chart.xyaxis.line", prominent: true) {
+                analysing = finished
+                AnalyseTip().invalidate(reason: .actionPerformed)
+            }
+            .disabled(finished == nil)
+            .popoverTip(AnalyseTip(), arrowEdge: .bottom)
             Divider().frame(height: 22)
             gameOverButton("Share", "square.and.arrow.up") { sharing = true }
             Divider().frame(height: 22)
@@ -312,6 +322,7 @@ struct GameScreen: View {
                 Button { session.requestHint() } label: {
                     Label("Hint", systemImage: "lightbulb")
                 }
+
                 .disabled(!session.isHumanTurn)
             }
 

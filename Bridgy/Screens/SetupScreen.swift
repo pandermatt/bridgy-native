@@ -1,5 +1,6 @@
 import BridgyEngine
 import SwiftUI
+import TipKit
 
 /// Choose the board and who plays each colour.
 ///
@@ -78,6 +79,7 @@ struct SetupScreen: View {
                 } label: {
                     Label("Play on a Table", systemImage: "square.3.layers.3d")
                 }
+                .popoverTip(TableTip())
             } footer: {
                 Text("Puts the board in the room in front of you.")
             }
@@ -116,6 +118,8 @@ struct SetupScreen: View {
             }
 
             Section {
+                TipView(PuzzleTip())
+                TipView(AgentTip())
                 NavigationLink {
                     PuzzleScreen()
                 } label: {

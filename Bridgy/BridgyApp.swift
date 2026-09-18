@@ -9,6 +9,7 @@ struct BridgyApp: App {
     init() {
         let model = AppModel()
         _model = State(initialValue: model)
+        BridgyTips.configure()
         // Siri, Shortcuts and the on-screen entities reach the app through this.
         AppDependencyManager.shared.add(dependency: model)
     }

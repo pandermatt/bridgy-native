@@ -4,6 +4,7 @@ import SwiftUI
 
 struct SettingsScreen: View {
     @Environment(AppModel.self) private var model
+    @State private var tipsReset = false
 
     var body: some View {
         @Bindable var settings = model.settings
@@ -94,6 +95,15 @@ struct SettingsScreen: View {
             }
 
             VictorySongSection(settings: settings)
+
+            Section {
+                Button("Show Tips Again") {
+                    BridgyTips.resetOnNextLaunch()
+                    tipsReset = true
+                }
+            } footer: {
+                if tipsReset { Text("Tips will show again next time you open Bridgy.") }
+            }
 
             Section("Watching two computers") {
                 WatchPaceControls(pace: $settings.watchPace)

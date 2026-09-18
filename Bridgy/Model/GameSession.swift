@@ -14,6 +14,8 @@ import Observation
 final class GameSession {
     /// Identifies this game to Siri and Shortcuts.
     let id = UUID()
+    /// This game rather than this screen: new each time the game restarts.
+    private(set) var gameID = UUID()
 
     /// Moves each player still needs, computed off the main actor and cached.
     ///
@@ -192,6 +194,7 @@ final class GameSession {
     @discardableResult
     func play(_ move: Move) -> Bool {
         guard isHumanTurn, state.isLegal(move) else { return false }
+        Task { await BridgyTipEvents.movePlayed.donate() }
         commit(move)
         return true
     }
@@ -212,6 +215,7 @@ final class GameSession {
     }
 
     func restart() {
+        gameID = UUID()
         cancelThinking()
         sound.stopAll()
         state = GameState(size: configuration.size)

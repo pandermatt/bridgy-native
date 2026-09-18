@@ -115,7 +115,11 @@ final class AppModel {
     /// has it — two engines answering the same position would each play a
     /// move — and every move on the table is saved, so the window picks up
     /// exactly where the table left off.
-    var tableGame: GameStore.Snapshot?
+    var tableGame: GameStore.Snapshot? {
+        // A new game on the table, or Play Again there, is a new game.
+        didSet { if tableGame?.state.moveCount == 0 || oldValue == nil { tableGameID = UUID() } }
+    }
+    private var tableGameID = UUID()
 
     /// Hands the game in the window to the table, as it stands.
     func moveGameToTable() {
@@ -139,7 +143,7 @@ final class AppModel {
         snapshot.state = state
         tableGame = snapshot
         store.save(snapshot)
-        if state.isOver { history.record(state, configuration: snapshot.configuration) }
+        if state.isOver { history.record(state, configuration: snapshot.configuration, source: tableGameID) }
     }
 
     /// The table is closed: the game comes back to the window, where it was.

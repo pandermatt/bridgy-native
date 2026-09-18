@@ -1,6 +1,7 @@
 import BridgyEngine
 import Foundation
 import Observation
+import TipKit
 
 /// One finished game from Play, kept so it can be replayed and recapped.
 struct PlayedGame: Codable, Identifiable, Hashable, Sendable {
@@ -10,6 +11,9 @@ struct PlayedGame: Codable, Identifiable, Hashable, Sendable {
     /// Who played Down and Across, as the replay shows them.
     let names: [String]
     let configuration: GameConfiguration
+    /// The game it came from, so a finished game shown twice is kept once —
+    /// while two separate games that happen to go the same way both count.
+    var source: UUID?
 
     var title: String { "\(names[0]) v \(names[1])" }
 
@@ -38,18 +42,24 @@ final class PlayHistory {
     /// Adds a finished game. The same position recorded twice — a result sheet
     /// shown again — is only kept once.
     @discardableResult
-    func record(_ state: GameState, configuration: GameConfiguration) -> PlayedGame? {
+    func record(_ state: GameState, configuration: GameConfiguration, source: UUID) -> PlayedGame? {
         guard state.isOver else { return nil }
         let record = GameRecord(state: state)
-        if let existing = games.first(where: { $0.record.moves == record.moves && $0.record.size == record.size }) {
+        if let existing = games.first(where: { $0.source == source && $0.record.moves == record.moves }) {
             return existing
         }
         let game = PlayedGame(
             id: UUID(), date: .now, record: record,
             names: [configuration.blue.displayName, configuration.red.displayName],
-            configuration: configuration
+            configuration: configuration, source: source
         )
         games.insert(game, at: 0)
+        if let me = configuration.soloHumanPlayer {
+            Task {
+                await BridgyTipEvents.gameFinished.donate()
+                if state.winner == me { await BridgyTipEvents.gameWon.donate() }
+            }
+        }
         if games.count > Self.limit { games.removeLast(games.count - Self.limit) }
         if let data = try? JSONEncoder().encode(games) { try? data.write(to: url, options: .atomic) }
         return game
