@@ -94,39 +94,62 @@ struct GameScreen: View {
         #endif
     }
 
-    @ViewBuilder
+    /// The board, and under it a strip of fixed height for everything that
+    /// comes and goes — tips, the end-of-game buttons. Sized for the tallest
+    /// of those, so the board never shrinks or jumps when one appears.
     private func content(settings: Bindable<AppSettings>) -> some View {
         VStack(spacing: 16) {
             board
-            if session.state.isOver, session.reviewIndex == nil {
+            footer(settings: settings)
+                .frame(maxWidth: .infinity)
+                .frame(height: Self.footerHeight, alignment: .top)
+        }
+        .animation(.smooth, value: session.state.isOver)
+    }
+
+    #if os(macOS)
+    private static let footerHeight: CGFloat = 132
+    #else
+    private static let footerHeight: CGFloat = 156
+    #endif
+
+    @ViewBuilder
+    private func footer(settings: Bindable<AppSettings>) -> some View {
+        if session.state.isOver, session.reviewIndex == nil {
+            VStack(spacing: 12) {
                 gameOverBar
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                if model.settings.suggestsVictorySong,
+                if BridgyBuild.musicKitReady, model.settings.suggestsVictorySong,
                    let winner = session.state.winner,
                    session.configuration.soloHumanPlayer == winner || session.configuration.isLocalTwoPlayer {
                     EndGameView(songID: MusicItemID(model.settings.victorySongID))
                         .transition(.opacity)
                 }
-            } else {
+            }
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else {
+            VStack(spacing: 12) {
                 if model.settings.showHints, !session.state.isOver {
                     hintLine
                 }
                 if isWatching {
                     paceControls(settings: settings)
                 }
-                // Inline rather than a popover: popovers from toolbar buttons
-                // don't show in the iOS 26 toolbar.
-                if session.isHumanTurn, session.configuration.soloHumanPlayer != nil, !isShared {
-                    TipView(HintTip())
+                // One tip at a time, so they fit the strip: the hint tip
+                // first, then Siri's. Inline rather than a popover: popovers
+                // from toolbar buttons don't show in the iOS 26 toolbar.
+                let solo = !isWatching && !isShared && session.configuration.soloHumanPlayer != nil
+                let hintTip = HintTip()
+                if solo, session.isHumanTurn, hintTip.shouldDisplay {
+                    TipView(hintTip)
+                } else {
+                    #if os(iOS)
+                    if solo, model.settings.showsSiriHintTip {
+                        SiriTipView(intent: SuggestMoveIntent(), isVisible: settings.showsSiriHintTip)
+                    }
+                    #endif
                 }
-                #if os(iOS)
-                if !isWatching, !isShared, session.configuration.soloHumanPlayer != nil, model.settings.showsSiriHintTip {
-                    SiriTipView(intent: SuggestMoveIntent(), isVisible: settings.showsSiriHintTip)
-                }
-                #endif
             }
         }
-        .animation(.smooth, value: session.state.isOver)
     }
 
     /// What to do with a finished game, in the order you'd want it: look at

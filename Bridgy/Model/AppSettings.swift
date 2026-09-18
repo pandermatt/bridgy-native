@@ -29,6 +29,11 @@ final class AppSettings {
     var puzzlesSolved: Int { didSet { store(puzzlesSolved, "puzzlesSolved") } }
     var puzzlesTried: Int { didSet { store(puzzlesTried, "puzzlesTried") } }
 
+    func resetPuzzleCounts() {
+        puzzlesSolved = 0
+        puzzlesTried = 0
+    }
+
     func recordPuzzle(solved: Bool) {
         puzzlesTried += 1
         if solved {

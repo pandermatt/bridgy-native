@@ -50,6 +50,13 @@ final class AppModel {
         return NeuralMCTSEngine(network: network, simulations: agent.parameters.simulations, name: agent.name)
     }
 
+    /// Settings › Reset Stats: the history the stats are built from, and the
+    /// puzzle count. Game Center keeps what it was already sent.
+    func resetStats() {
+        history.removeAll()
+        settings.resetPuzzleCounts()
+    }
+
     func prepareAudio() {
         guard settings.soundEnabled else { return }
         sound.prepare()

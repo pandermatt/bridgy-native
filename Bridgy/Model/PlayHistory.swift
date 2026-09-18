@@ -75,6 +75,15 @@ final class PlayHistory {
         onChange?(.gameDeleted(game.id))
     }
 
+    /// Every finished game, gone — Reset Stats. Each deletion reaches iCloud
+    /// too, or the next sync would bring them all back.
+    func removeAll() {
+        let removed = games
+        games = []
+        persist()
+        for game in removed { onChange?(.gameDeleted(game.id)) }
+    }
+
     func game(_ id: UUID) -> PlayedGame? { games.first { $0.id == id } }
 
     /// A game from iCloud, placed by date, without echoing back.

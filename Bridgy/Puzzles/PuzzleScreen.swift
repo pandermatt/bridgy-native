@@ -6,6 +6,7 @@ struct PuzzleScreen: View {
     @Environment(AppModel.self) private var model
     @State private var session: PuzzleSession?
     @State private var size: PuzzleSession.Size = .medium
+    @State private var hoverPoint: CGPoint?
 
     var body: some View {
         VStack(spacing: 16) {
@@ -57,6 +58,11 @@ struct PuzzleScreen: View {
         }
     }
 
+    private func candidate(_ session: PuzzleSession, in geometry: BoardGeometry) -> Move? {
+        guard session.status == .yourMove, let hoverPoint else { return nil }
+        return geometry.nearestCell(to: hoverPoint) { session.state.isLegal($0) }
+    }
+
     private func board(_ session: PuzzleSession) -> some View {
         GeometryReader { proxy in
             let geometry = BoardGeometry(board: session.state.board, rect: CGRect(origin: .zero, size: proxy.size))
@@ -66,6 +72,7 @@ struct PuzzleScreen: View {
                 style: model.settings.boardStyle,
                 cap: model.settings.bridgeCap,
                 guideDots: true,
+                candidate: candidate(session, in: geometry),
                 highlightsLastMove: !session.state.isOver
             )
             .overlay {
@@ -81,6 +88,14 @@ struct PuzzleScreen: View {
                     if let move { session.play(move) }
                 }
             )
+            // The same ghost the game board shows under the pointer on a Mac
+            // or an iPad with a trackpad.
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let point): hoverPoint = point
+                case .ended: hoverPoint = nil
+                }
+            }
         }
         .aspectRatio(1, contentMode: .fit)
         .animation(.smooth(duration: 0.18), value: session.state.moveCount)

@@ -38,11 +38,20 @@ struct BridgyApp: App {
                     .keyboardShortcut("z", modifiers: .command)
                     .disabled(model.session?.canUndo != true)
             }
+            // Show/Hide Sidebar in View, where it belongs; without this it
+            // landed in the Help menu.
+            SidebarCommands()
             CommandGroup(after: .sidebar) {
                 ForEach(Array(AppTab.sidebar.prefix(5).enumerated()), id: \.element) { index, tab in
                     Button(tab.title) { model.requestedTab = tab }
                         .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
                 }
+                #if os(macOS)
+                // Settings is a window of its own on the Mac, not a sidebar
+                // entry, but people look for it next to the other places.
+                Divider()
+                OpenSettingsButton()
+                #endif
             }
             CommandMenu("Lab") {
                 Button("Show Experiments") { model.requestedTab = .lab }
@@ -99,3 +108,14 @@ struct BridgyApp: App {
     static let tableSpace = "bridgy.table"
     #endif
 }
+
+#if os(macOS)
+/// Opens the Settings window; a view, because that's where the action lives.
+private struct OpenSettingsButton: View {
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Button("Settings…") { openSettings() }
+    }
+}
+#endif

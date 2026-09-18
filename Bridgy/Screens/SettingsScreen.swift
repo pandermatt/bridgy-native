@@ -5,6 +5,7 @@ import SwiftUI
 struct SettingsScreen: View {
     @Environment(AppModel.self) private var model
     @State private var tipsReset = false
+    @State private var confirmingStatsReset = false
 
     var body: some View {
         @Bindable var settings = model.settings
@@ -113,7 +114,9 @@ struct SettingsScreen: View {
                 }
             }
 
-            VictorySongSection(settings: settings)
+            if BridgyBuild.musicKitReady {
+                VictorySongSection(settings: settings)
+            }
 
             if BridgyBuild.hasPaidEntitlements {
             Section {
@@ -132,6 +135,21 @@ struct SettingsScreen: View {
                 }
             } footer: {
                 if tipsReset { Text("Tips will show again next time you open Bridgy.") }
+            }
+
+            Section {
+                Button("Reset Stats…", role: .destructive) { confirmingStatsReset = true }
+                    .confirmationDialog(
+                        "Reset your stats?",
+                        isPresented: $confirmingStatsReset,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Reset Stats", role: .destructive) { model.resetStats() }
+                    } message: {
+                        Text("Deletes every finished game and your puzzle count, on all your devices. Agents and experiments are kept.")
+                    }
+            } footer: {
+                Text("\(model.history.games.count) finished games, \(settings.puzzlesSolved) puzzles solved.")
             }
 
             Section("Watching two computers") {
