@@ -105,4 +105,48 @@ final class AppModel {
     }
 
     var canResume: Bool { resumable != nil }
+
+    // MARK: - The table (Vision Pro)
+
+    /// The game while it is being played on the table in the room: where it
+    /// started and every move since. Nil when there is no table open.
+    ///
+    /// One game, two places. The window's session is parked while the table
+    /// has it — two engines answering the same position would each play a
+    /// move — and every move on the table is saved, so the window picks up
+    /// exactly where the table left off.
+    var tableGame: GameStore.Snapshot?
+
+    /// Hands the game in the window to the table, as it stands.
+    func moveGameToTable() {
+        let snapshot = session.map { GameStore.Snapshot(configuration: $0.configuration, state: $0.state) }
+            ?? resumable
+            ?? GameStore.Snapshot(configuration: configuration, state: GameState(size: configuration.size))
+        parkSession()
+        tableGame = snapshot
+    }
+
+    /// A new game, straight onto the table.
+    func startTableGame(_ configuration: GameConfiguration) {
+        parkSession()
+        self.configuration = configuration
+        tableGame = GameStore.Snapshot(configuration: configuration, state: GameState(size: configuration.size))
+    }
+
+    /// A move on the table, or a new game started there.
+    func tableDidChange(_ state: GameState) {
+        guard var snapshot = tableGame else { return }
+        snapshot.state = state
+        tableGame = snapshot
+        store.save(snapshot)
+        if state.isOver { history.record(state, configuration: snapshot.configuration) }
+    }
+
+    /// The table is closed: the game comes back to the window, where it was.
+    func tableDidClose() {
+        guard tableGame != nil else { return }
+        tableGame = nil
+        resumable = store.load()
+        resumeGame()
+    }
 }

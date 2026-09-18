@@ -24,30 +24,40 @@ struct ImmersiveBoardView: View {
     @State private var onSurface = false
     @State private var tables = TableFinder()
     private let theme: BoardTheme
+    private let onChange: (GameState) -> Void
+    private let onClose: () -> Void
 
     /// Ahead and a little below eye level: about coffee-table height when
     /// sitting, and within reach.
     static let startPosition = SIMD3<Float>(0, -0.45, -1.0)
 
+    /// `game` is the position to set up — a game carried over from the
+    /// window arrives with its bridges already on the water. Every move made
+    /// here goes back through `onChange`.
     init(
-        configuration: GameConfiguration,
+        game: GameStore.Snapshot,
         theme: BoardTheme,
         style: BoardStyle,
-        agentEngine: (UUID) -> (any Engine)? = { _ in nil }
+        agentEngine: (UUID) -> (any Engine)? = { _ in nil },
+        onChange: @escaping (GameState) -> Void = { _ in },
+        onClose: @escaping () -> Void = {}
     ) {
-        let board = Board(size: configuration.size)
-        let table = TabletopBoardBuilder(board: board, theme: theme, style: style).build()
+        let configuration = game.configuration
+        let table = TabletopBoardBuilder(
+            board: game.state.board, theme: theme, style: style, initial: game.state
+        ).build()
         self.theme = theme
+        self.onChange = onChange
+        self.onClose = onClose
         _table = State(initialValue: table)
-        _rules = State(
-            initialValue: BridgyRules(
-                board: board,
-                seats: [.blue: configuration.blue, .red: configuration.red],
-                slots: table.slots,
-                pieces: table.pieces,
-                agentEngine: agentEngine
-            )
+        let rules = BridgyRules(
+            table: table,
+            initial: game.state,
+            seats: [.blue: configuration.blue, .red: configuration.red],
+            agentEngine: agentEngine
         )
+        rules.onChange = onChange
+        _rules = State(initialValue: rules)
     }
 
     var body: some View {
@@ -110,6 +120,7 @@ struct ImmersiveBoardView: View {
                 }
         )
         .task { await tables.run() }
+        .onDisappear { onClose() }
         .task { await runTestSeams() }
     }
 

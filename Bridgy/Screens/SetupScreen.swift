@@ -71,10 +71,9 @@ struct SetupScreen: View {
             #if os(visionOS)
             Section {
                 Button {
-                    // The table reads the model's configuration, which Start
-                    // would normally commit. Commit it here too, or the seats and
-                    // size just chosen above would be ignored.
-                    model.configuration = configuration
+                    // A new game with the seats and size chosen above, set up
+                    // on the table rather than in the window.
+                    model.startTableGame(configuration)
                     Task { await openImmersiveSpace(id: BridgyApp.tableSpace) }
                 } label: {
                     Label("Play on a Table", systemImage: "square.3.layers.3d")

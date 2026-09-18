@@ -69,6 +69,8 @@ struct AppRoot: View {
             // a launch open the table directly:
             //   simctl launch <device> <bundle> -BridgyOpenTable YES
             if UserDefaults.standard.bool(forKey: "BridgyOpenTable") {
+                // Carries the saved game over, as the button in a game does.
+                model.moveGameToTable()
                 await openImmersiveSpace(id: BridgyApp.tableSpace)
             }
             #endif
@@ -241,11 +243,21 @@ struct PlayTab: View {
 
     var body: some View {
         NavigationStack {
+            #if os(visionOS)
+            if let game = model.tableGame {
+                TableMirror(game: game)
+            } else if let session = model.session {
+                GameScreen(session: session, showingInspector: $showingInspector)
+            } else {
+                SetupScreen()
+            }
+            #else
             if let session = model.session {
                 GameScreen(session: session, showingInspector: $showingInspector)
             } else {
                 SetupScreen()
             }
+            #endif
         }
         .platformInspector(isPresented: Binding(
             get: { showingInspector && model.session != nil },
@@ -287,3 +299,36 @@ private extension View {
         #endif
     }
 }
+
+#if os(visionOS)
+/// The window while the game is out on the table: the same position, kept up
+/// to date move by move, and the way to bring the game back.
+struct TableMirror: View {
+    let game: GameStore.Snapshot
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+
+    var body: some View {
+        VStack(spacing: 20) {
+            BoardCanvas(
+                state: game.state,
+                theme: model.settings.theme,
+                style: model.settings.boardStyle,
+                cap: model.settings.bridgeCap,
+                guideDots: true
+            )
+            .aspectRatio(1, contentMode: .fit)
+            .frame(maxWidth: 420)
+            Button {
+                Task { await dismissImmersiveSpace() }
+            } label: {
+                Label("Continue in the Window", systemImage: "macwindow")
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding()
+        .navigationTitle("Playing on the Table")
+        .platformSubtitle("\(game.configuration.summary) · \(game.state.moveCount) moves")
+    }
+}
+#endif

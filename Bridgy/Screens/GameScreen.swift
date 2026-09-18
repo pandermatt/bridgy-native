@@ -8,6 +8,9 @@ struct GameScreen: View {
     @Bindable var session: GameSession
     @Environment(AppModel.self) private var model
     @Binding var showingInspector: Bool
+    #if os(visionOS)
+    @Environment(\.openImmersiveSpace) private var openImmersiveSpace
+    #endif
     /// The game just finished, as kept in the history, for the recap.
     @State private var finished: PlayedGame?
     @State private var analysing: PlayedGame?
@@ -269,6 +272,17 @@ struct GameScreen: View {
     /// it.
     @ToolbarContentBuilder
     private func actions(settings: Bindable<AppSettings>) -> some ToolbarContent {
+        #if os(visionOS)
+        ToolbarItem(placement: .primaryAction) {
+            // The game as it stands, set up on a table in the room.
+            Button {
+                model.moveGameToTable()
+                Task { await openImmersiveSpace(id: BridgyApp.tableSpace) }
+            } label: {
+                Label("Play on a Table", systemImage: "square.3.layers.3d")
+            }
+        }
+        #endif
         ToolbarItem(placement: .primaryAction) {
             Button { showingInspector.toggle() } label: {
                 Label("Game Details", systemImage: inspectorSymbol)

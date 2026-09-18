@@ -183,6 +183,10 @@ struct TabletopBoardBuilder {
     let theme: BoardTheme
     let style: BoardStyle
 
+    /// The position to set up. Bridges already played start on their gaps,
+    /// so a game carried over from the window carries on where it was.
+    var initial: GameState? = nil
+
     func build() -> TabletopBoard {
         BoardHandleComponent.registerComponent()
         let metrics = BoardMetrics(board: board)
@@ -236,7 +240,11 @@ struct TabletopBoardBuilder {
         // TableSetup, so there is no dealing another bridge later. Each side
         // gets exactly as many as it could ever play.
         var pieces: [BridgePiece] = []
+        var homes: [EquipmentIdentifier: TableVisualState.Pose2D] = [:]
         var nextID = board.cellCount + 1
+        // The cells each side has already bridged, in the order played. A
+        // side's first pieces go there; the rest wait in its tray.
+        let played = Self.playedCells(in: initial)
         for side in BoardSide.allCases {
             let total = side == .blue
                 ? (board.cellCount + 1) / 2
@@ -244,17 +252,20 @@ struct TabletopBoardBuilder {
             for index in 0..<total {
                 let entity = bridgeModel(metrics: metrics, player: side)
                 surface.addChild(entity)
+                let home = trayPose(metrics: metrics, side: side, index: index)
+                let onCell = played[side].flatMap { index < $0.count ? $0[index] : nil }
                 let piece = BridgePiece(
                     id: EquipmentIdentifier(nextID),
                     entity: entity,
                     initialState: BaseEquipmentState(
-                        parentID: tabletop.id,
+                        parentID: onCell.map { slots[$0].id } ?? tabletop.id,
                         seatControl: .any,
-                        pose: trayPose(metrics: metrics, side: side, index: index),
+                        pose: onCell == nil ? home : .identity,
                         entity: entity
                     ),
                     owner: side
                 )
+                homes[piece.id] = home
                 pieces.append(piece)
                 setup.add(equipment: piece)
                 nextID += 1
@@ -269,8 +280,22 @@ struct TabletopBoardBuilder {
             pieces: pieces,
             seats: seats,
             theme: theme,
-            style: style
+            style: style,
+            tabletopID: tabletop.id,
+            homes: homes
         )
+    }
+
+    /// Each side's bridged cells, in the order they were played.
+    static func playedCells(in state: GameState?) -> [BoardSide: [Int]] {
+        guard let state else { return [:] }
+        var result: [BoardSide: [Int]] = [:]
+        for move in state.moves {
+            let cell = state.board.index(of: move)
+            guard let owner = state.cells[cell] else { continue }
+            result[owner, default: []].append(cell)
+        }
+        return result
     }
 
     /// The water is this deep; the tabletop shape has to agree.
@@ -541,6 +566,9 @@ final class TabletopBoard {
     let seats: [BridgySeat]
     let theme: BoardTheme
     let style: BoardStyle
+    let tabletopID: EquipmentIdentifier
+    /// Where each piece waits in its tray, to send it back for a new game.
+    let homes: [EquipmentIdentifier: TableVisualState.Pose2D]
 
     init(
         root: Entity,
@@ -550,8 +578,12 @@ final class TabletopBoard {
         pieces: [BridgePiece],
         seats: [BridgySeat],
         theme: BoardTheme,
-        style: BoardStyle
+        style: BoardStyle,
+        tabletopID: EquipmentIdentifier,
+        homes: [EquipmentIdentifier: TableVisualState.Pose2D]
     ) {
+        self.tabletopID = tabletopID
+        self.homes = homes
         self.root = root
         self.game = game
         self.metrics = metrics

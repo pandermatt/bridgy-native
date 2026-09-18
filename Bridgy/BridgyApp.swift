@@ -67,13 +67,19 @@ struct BridgyApp: App {
 
         #if os(visionOS)
         ImmersiveSpace(id: BridgyApp.tableSpace) {
-            ImmersiveBoardView(
-                configuration: model.configuration,
-                theme: model.settings.theme,
-                style: model.settings.boardStyle,
-                agentEngine: model.agentEngine
-            )
-            .environment(model)
+            if let game = model.tableGame {
+                ImmersiveBoardView(
+                    game: game,
+                    theme: model.settings.theme,
+                    style: model.settings.boardStyle,
+                    agentEngine: model.agentEngine,
+                    onChange: model.tableDidChange,
+                    onClose: model.tableDidClose
+                )
+                // One table per game: a new game builds a new table.
+                .id(game.configuration)
+                .environment(model)
+            }
         }
         .immersionStyle(selection: .constant(.mixed), in: .mixed)
         #endif

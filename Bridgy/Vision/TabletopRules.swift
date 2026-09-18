@@ -66,9 +66,8 @@ final class BridgyRules {
     /// The full piles as dealt, so a new game can put them back.
     @ObservationIgnored private let dealt: [BoardSide: [EquipmentIdentifier]]
 
-    /// The empty table, bookmarked before the first move so a new game can
-    /// return every bridge to its pile in one step.
-    private static let freshTable = StateBookmarkIdentifier(1)
+    @ObservationIgnored private let tabletopID: EquipmentIdentifier
+    @ObservationIgnored private let homes: [EquipmentIdentifier: TableVisualState.Pose2D]
 
     @ObservationIgnored private weak var game: TabletopGame?
     @ObservationIgnored private var engines: [BoardSide: any Engine] = [:]
@@ -81,19 +80,27 @@ final class BridgyRules {
     @ObservationIgnored let gaps = PlayableGaps()
 
     init(
-        board: Board,
+        table: TabletopBoard,
+        initial: GameState,
         seats: [BoardSide: Seat],
-        slots: [BridgeSlot],
-        pieces: [BridgePiece],
         agentEngine: (UUID) -> (any Engine)? = { _ in nil }
     ) {
-        self.state = GameState(board: board)
+        let board = initial.board
+        let slots = table.slots
+        let pieces = table.pieces
+        self.tabletopID = table.tabletopID
+        self.homes = table.homes
+        self.state = initial
         self.seats = seats
         self.slotIDByCell = Dictionary(uniqueKeysWithValues: slots.map { ($0.cell, $0.id) })
         self.cellBySlotID = Dictionary(uniqueKeysWithValues: slots.map { ($0.id, $0.cell) })
         self.ownerByPieceID = Dictionary(uniqueKeysWithValues: pieces.map { ($0.id, $0.owner) })
         let piles = Dictionary(grouping: pieces, by: \.owner).mapValues { $0.map(\.id) }
-        self.spare = piles
+        // The builder put each side's first pieces on the gaps already played.
+        let played = TabletopBoardBuilder.playedCells(in: initial)
+        self.spare = piles.mapValues { $0 }.reduce(into: [:]) { result, entry in
+            result[entry.key] = Array(entry.value.dropFirst(played[entry.key]?.count ?? 0))
+        }
         self.dealt = piles
 
         for side in BoardSide.allCases {
@@ -111,7 +118,6 @@ final class BridgyRules {
     func attach(to game: TabletopGame) {
         self.game = game
         game.addObserver(self)
-        game.addAction(.createBookmark(id: Self.freshTable))
         republishGaps()
         startIfComputerLeads()
     }
@@ -119,10 +125,15 @@ final class BridgyRules {
     /// Back to an empty table, every bridge in its pile, same seats.
     func playAgain() {
         guard let game else { return }
+        // Every bridge on the water goes back to its place in the tray.
+        let used = Set(dealt.values.joined()).subtracting(spare.values.joined())
+        for piece in used {
+            game.addAction(.moveEquipment(matching: piece, childOf: tabletopID, pose: homes[piece]))
+        }
         state = GameState(board: state.board)
         spare = dealt
         republishGaps()
-        game.jumpToBookmark(StateBookmark(id: Self.freshTable))
+        onChange?(state)
         startIfComputerLeads()
     }
 
