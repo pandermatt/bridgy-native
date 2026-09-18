@@ -141,7 +141,9 @@ struct LabScreen: View {
                 Menu {
                     newExperimentItems
                 } label: {
+                    // Menus in a list row drop a label's icon unless told otherwise.
                     Label("New Experiment", systemImage: "plus")
+                        .labelStyle(.titleAndIcon)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
