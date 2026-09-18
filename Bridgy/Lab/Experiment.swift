@@ -158,6 +158,18 @@ struct GameRecord: Codable, Hashable, Sendable, Identifiable {
         seed = outcome.seed
     }
 
+    /// A game played in Play, where "Down" and "Across" are indices 0 and 1
+    /// into the history entry's own names.
+    init(state: GameState, seed: UInt64 = 0) {
+        index = 0
+        size = state.board.size
+        down = 0
+        across = 1
+        winner = state.winner ?? .blue
+        moves = state.moves.map { UInt16(state.board.index(of: $0)) }
+        self.seed = seed
+    }
+
     var outcome: Tournament.Outcome {
         Tournament.Outcome(gameIndex: index, size: size, blue: down, red: across, winner: winner, moves: moves, seed: seed)
     }

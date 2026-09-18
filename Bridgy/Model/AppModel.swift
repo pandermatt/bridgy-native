@@ -17,6 +17,8 @@ final class AppModel {
     /// Also here, so experiments keep running — and their results stay —
     /// while you switch to another part of the app.
     let library = ExperimentLibrary()
+    /// Finished games from Play, for replay and recap.
+    let history = PlayHistory()
     let runner = ExperimentRunner()
 
     /// Set by an intent to bring a part of the app forward; the root clears it.

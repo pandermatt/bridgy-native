@@ -14,11 +14,19 @@ struct AgentDetailView: View {
     @State private var newName = ""
     @State private var error: String?
 
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var usesSidebar: Bool { sizeClass == .regular }
+    #else
+    private var usesSidebar: Bool { true }
+    #endif
+
     private var agent: SavedAgent? { model.agents.agents.first { $0.id == agentID } }
 
     var body: some View {
         if let agent {
             Form {
+                identitySection(agent)
                 Section {
                     LabeledContent("Practised on", value: "\(agent.parameters.boardSize)×\(agent.parameters.boardSize)")
                     LabeledContent("Network", value: "\(agent.parameters.channels) wide, \(agent.parameters.blocks) deep")
@@ -39,25 +47,25 @@ struct AgentDetailView: View {
                     Button { play(agent) } label: {
                         Label("Play Against \(agent.name)", systemImage: "play.fill")
                     }
-                    Button { run.start(store: model.agents, continuing: agent); dismiss() } label: {
+                    Button {
+                        run.start(store: model.agents, continuing: agent)
+                        dismiss()
+                        // From the sidebar there is nothing to go back to: go
+                        // to Agents, where the run's progress is.
+                        if usesSidebar { model.requestedTab = .agents }
+                    } label: {
                         Label("Continue Training", systemImage: "arrow.clockwise")
                     }
                     .disabled(run.isRunning || GraphTrainer.unavailableReason != nil)
                 }
                 Section {
                     if let file = try? model.agents.file(for: agent) {
-                        ShareLink(item: SharedAgent(file: file), preview: SharePreview(agent.name, image: Image(systemName: "brain"))) {
+                        ShareLink(item: SharedAgent(file: file), preview: SharePreview(agent.name, image: Image(systemName: agent.symbolName))) {
                             Label("Share…", systemImage: "square.and.arrow.up")
                         }
                     }
                     Button { export(agent) } label: {
                         Label("Export to Files…", systemImage: "folder")
-                    }
-                    Button {
-                        newName = agent.name
-                        renaming = true
-                    } label: {
-                        Label("Rename…", systemImage: "pencil")
                     }
                     Button(role: .destructive) { confirmingDelete = true } label: {
                         Label("Delete Agent", systemImage: "trash")
@@ -93,6 +101,52 @@ struct AgentDetailView: View {
             }
         } else {
             ContentUnavailableView("Agent deleted", systemImage: "brain")
+        }
+    }
+
+    /// Name and symbol, the two things that are the agent's own to choose.
+    private func identitySection(_ agent: SavedAgent) -> some View {
+        Section {
+            HStack(spacing: 14) {
+                Image(systemName: agent.symbolName)
+                    .font(.title)
+                    .foregroundStyle(.tint)
+                    .frame(width: 52, height: 52)
+                    .background(.tint.opacity(0.15), in: .rect(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(agent.name).font(.title3.weight(.semibold))
+                    Text(agent.summary).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Rename") {
+                    newName = agent.name
+                    renaming = true
+                }
+                .buttonStyle(.bordered)
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 40), spacing: 8)], spacing: 8) {
+                ForEach(SavedAgent.symbols, id: \.self) { symbol in
+                    Button {
+                        model.agents.setSymbol(symbol, for: agent)
+                    } label: {
+                        Image(systemName: symbol)
+                            .font(.title3)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                symbol == agent.symbolName ? AnyShapeStyle(.tint.opacity(0.25)) : AnyShapeStyle(.quaternary.opacity(0.5)),
+                                in: .rect(cornerRadius: 10)
+                            )
+                            .foregroundStyle(symbol == agent.symbolName ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(symbol)
+                    .accessibilityAddTraits(symbol == agent.symbolName ? .isSelected : [])
+                }
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Name and icon")
         }
     }
 

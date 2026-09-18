@@ -36,8 +36,7 @@ struct GameInspector: View {
             movesSection
         }
         .formStyle(.grouped)
-        .navigationTitle("Game")
-        .inspectorTitleDisplay()
+        .inspectorTitle()
         .toolbar {
             #if os(iOS)
             // On iPhone the inspector is a sheet, and a sheet needs a way out.
@@ -261,10 +260,13 @@ struct GameInspector: View {
 }
 
 private extension View {
+    /// Only where the inspector is its own sheet with its own navigation stack
+    /// (iOS). Beside the board it shares the game's navigation bar, and a
+    /// title here replaced "Your turn" with "Game".
     @ViewBuilder
-    func inspectorTitleDisplay() -> some View {
+    func inspectorTitle() -> some View {
         #if os(iOS)
-        navigationBarTitleDisplayMode(.inline)
+        navigationTitle("Game").navigationBarTitleDisplayMode(.inline)
         #else
         self
         #endif

@@ -70,10 +70,15 @@ struct ExperimentDetail: View {
     private func content(_ experiment: Experiment, analysis: ExperimentAnalysis) -> some View {
         switch page {
         case .games:
-            VStack(spacing: 0) {
-                pagePicker.padding()
-                GamesView(analysis: analysis)
-            }
+            // The picker rides in a safe-area bar rather than above the list
+            // in a stack: stacked, the list no longer reached the top, so the
+            // navigation bar lost its glass over an opaque band.
+            GamesView(analysis: analysis)
+                .safeAreaBar(edge: .top) {
+                    pagePicker
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                }
         default:
             Form {
                 Section { pagePicker.listRowBackground(Color.clear).listRowInsets(EdgeInsets()) }

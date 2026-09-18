@@ -6,8 +6,22 @@ import SwiftUI
 struct GameScreen: View {
     @Bindable var session: GameSession
     @Environment(AppModel.self) private var model
-    @State private var showingResult = false
     @Binding var showingInspector: Bool
+    /// The game just finished, as kept in the history, for the recap.
+    @State private var finished: PlayedGame?
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
+
+    /// A sidebar symbol where the inspector is a sidebar; on iPhone it rises
+    /// from the bottom as a sheet of statistics, so it gets a chart instead.
+    private var inspectorSymbol: String {
+        #if os(iOS)
+        sizeClass == .compact ? "chart.bar.xaxis" : "sidebar.right"
+        #else
+        "sidebar.right"
+        #endif
+    }
 
     private var isWatching: Bool { session.configuration.isWatchOnly }
 
@@ -26,10 +40,13 @@ struct GameScreen: View {
             .appEntityIdentifier(EntityIdentifier(for: GameEntity.self, identifier: session.id))
             .onAppear { session.begin() }
             .onDisappear { session.stop() }
-            .onChange(of: session.state.winner) { _, winner in showingResult = winner != nil }
-
-            .onChange(of: model.settings.watchPace) { _, _ in session.paceChanged() }
-            .sheet(isPresented: $showingResult) {
+            .onChange(of: session.state.winner) { _, winner in
+                // Presented by item, so the sheet is built with the recorded
+                // game in hand; a Bool flag built it before `finished` was set.
+                guard winner != nil else { finished = nil; return }
+                finished = model.history.record(session.state, configuration: session.configuration)
+            }
+            .sheet(item: $finished) { game in
                 ResultSheet(
                     state: session.state,
                     configuration: session.configuration,
@@ -37,6 +54,7 @@ struct GameScreen: View {
                     cap: model.settings.bridgeCap,
                     initialStyle: model.settings.boardStyle,
                     highlightsWinningPath: model.settings.highlightsWinningPath,
+                    recap: game,
                     onPlayAgain: { session.restart() },
                     onChangeSetup: { model.session = nil }
                 )
@@ -199,7 +217,7 @@ struct GameScreen: View {
     private func actions(settings: Bindable<AppSettings>) -> some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             Button { showingInspector.toggle() } label: {
-                Label("Inspector", systemImage: "sidebar.right")
+                Label("Game Details", systemImage: inspectorSymbol)
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
         }

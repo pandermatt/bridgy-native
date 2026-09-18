@@ -11,6 +11,7 @@ struct SetupScreen: View {
     @Environment(\.availableBoardSide) private var availableBoardSide
     @State private var configuration = GameConfiguration.default
     @State private var hasLoaded = false
+    @State private var replaying: PlayedGame?
     #if os(visionOS)
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
     #endif
@@ -114,9 +115,16 @@ struct SetupScreen: View {
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
             }
+
+            if !model.history.games.isEmpty {
+                recentGamesSection
+            }
         }
         .formStyle(.grouped)
         .navigationTitle("Bridgy")
+        .sheet(item: $replaying) { game in
+            ReplayView(record: game.record, names: game.names)
+        }
         .onAppear {
             if !hasLoaded {
                 configuration = model.configuration
@@ -128,6 +136,39 @@ struct SetupScreen: View {
         .onChange(of: configuration.blue) { _, _ in clampSize() }
         .onChange(of: configuration.red) { _, _ in clampSize() }
         .onChange(of: availableBoardSide) { _, _ in clampSize() }
+    }
+
+    /// The last three finished games, the way the Lab lists its games; a tap
+    /// replays one with its race and commentary.
+    private var recentGamesSection: some View {
+        Section {
+            ForEach(model.history.games.prefix(3)) { game in
+                Button { replaying = game } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(game.title).font(.headline)
+                            Text("\(game.record.size)×\(game.record.size) · \(game.winnerName) won as \(game.record.winner.displayName) · \(game.date.formatted(.relative(presentation: .named)))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text("\(game.record.length)").font(.title3.monospacedDigit().weight(.semibold))
+                        Text("moves").font(.caption).foregroundStyle(.secondary)
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .swipeActions {
+                    Button(role: .destructive) { model.history.delete(game) } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+            }
+        } header: {
+            Text("Recent games")
+        } footer: {
+            Text("Tap one to replay it, with the race and a recap.")
+        }
     }
 
     private var startGradient: LinearGradient {
@@ -167,14 +208,14 @@ struct SetupScreen: View {
             LabeledContent {
                 Menu {
                     Picker("Played by", selection: binding(for: player)) {
-                        Text("You").tag(Seat.human)
+                        Label("You", systemImage: Seat.human.symbolName).tag(Seat.human)
                         ForEach(Difficulty.allCases) { level in
-                            Text(level.displayName).tag(Seat.computer(level))
+                            Label(level.displayName, systemImage: level.symbolName).tag(Seat.computer(level))
                         }
                         if !model.agents.agents.isEmpty {
                             Divider()
                             ForEach(model.agents.agents) { agent in
-                                Label(agent.name, systemImage: "brain").tag(Seat.agent(agent.id, name: agent.name))
+                                Label(agent.name, systemImage: agent.symbolName).tag(Seat.agent(agent.id, name: agent.name))
                             }
                         }
                     }
@@ -223,12 +264,19 @@ struct SetupScreen: View {
     /// the up/down chevron a picker would have drawn.
     private func seatValue(_ seat: Seat) -> some View {
         HStack(spacing: 7) {
-            Image(systemName: seat.symbolName)
+            Image(systemName: symbol(for: seat))
             Text(seat.displayName)
             Image(systemName: "chevron.up.chevron.down")
                 .imageScale(.small)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// A seat's symbol, looking an agent's up in the store — the seat only
+    /// remembers its id and name.
+    private func symbol(for seat: Seat) -> String {
+        if case .agent(let id, _) = seat { return model.agents.symbol(for: id) }
+        return seat.symbolName
     }
 
     private func binding(for player: Player) -> Binding<Seat> {

@@ -16,6 +16,19 @@ struct SavedAgent: Codable, Identifiable, Hashable, Sendable {
     var updated: Date
     /// Latest win rate against each benchmark opponent, by name.
     var benchmarks: [String: Double]
+    /// The SF Symbol it goes by. Optional so agents saved before there was a
+    /// choice still load; they show the brain.
+    var symbol: String?
+
+    var symbolName: String { symbol ?? "brain" }
+
+    /// Symbols an agent can choose from.
+    static let symbols = [
+        "brain", "brain.head.profile", "cpu", "bolt", "flame", "sparkles",
+        "star", "moon.stars", "leaf", "tortoise", "hare", "bird",
+        "fish", "ant", "ladybug", "pawprint", "crown", "trophy",
+        "atom", "wand.and.stars", "dice", "gamecontroller", "puzzlepiece", "infinity"
+    ]
 
     var summary: String {
         let size = parameters.boardSize
@@ -118,6 +131,16 @@ final class AgentStore {
         let weights = try NetworkWeights(architecture: agent.parameters.architecture, data: file.weights)
         try save(agent, weights: weights)
         return agent
+    }
+
+    func setSymbol(_ symbol: String, for agent: SavedAgent) {
+        guard var updated = agents.first(where: { $0.id == agent.id }) else { return }
+        updated.symbol = symbol
+        update(updated)
+    }
+
+    func symbol(for id: UUID) -> String {
+        agents.first { $0.id == id }?.symbolName ?? "brain"
     }
 
     func rename(_ agent: SavedAgent, to name: String) {

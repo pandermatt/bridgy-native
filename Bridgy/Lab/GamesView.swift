@@ -135,6 +135,17 @@ struct ReplayView: View {
 
     private var count: Int { Int(step.rounded()) }
 
+    /// Games from Play have no seed and no place in an experiment: those parts
+    /// are left out rather than shown as "Game 1 · seed 0000…".
+    private var subtitle: String {
+        var parts = ["\(record.size)×\(record.size)", "\(names[record.winner == .blue ? record.down : record.across]) won as \(record.winner.displayName)"]
+        if record.seed != 0 {
+            parts.insert("Game \(record.index + 1)", at: 0)
+            parts.append("seed \(String(format: "%016llX", record.seed))")
+        }
+        return parts.joined(separator: " · ")
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 12) {
@@ -165,7 +176,8 @@ struct ReplayView: View {
             }
             .padding()
             .navigationTitle("\(names[record.down]) v \(names[record.across])")
-            .platformSubtitle("Game \(record.index + 1) · \(record.size)×\(record.size) · \(names[record.winner == .blue ? record.down : record.across]) won as \(record.winner.displayName) · seed \(String(format: "%016llX", record.seed))")
+            .replayTitleDisplay()
+            .platformSubtitle(subtitle)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
@@ -257,5 +269,16 @@ enum RaceHistory {
             .sorted { abs($0.swing) > abs($1.swing) }
             .prefix(limit)
             .sorted { $0.move < $1.move }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func replayTitleDisplay() -> some View {
+        #if os(iOS)
+        navigationBarTitleDisplayMode(.inline)
+        #else
+        self
+        #endif
     }
 }

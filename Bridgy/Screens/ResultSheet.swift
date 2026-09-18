@@ -9,11 +9,14 @@ import SwiftUI
 struct ResultSheet: View {
     let state: GameState
     let configuration: GameConfiguration
+    /// The finished game, for "Recap Game": replay, race and commentary.
+    var recap: PlayedGame?
     var onPlayAgain: () -> Void
     var onChangeSetup: () -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var shareURL: URL?
+    @State private var recapping: PlayedGame?
 
     /// Every one of these is local to this sheet on purpose. Dressing a finished
     /// game up for sharing is about the picture, not about how the next game will
@@ -35,11 +38,13 @@ struct ResultSheet: View {
         cap: BridgeCap,
         initialStyle: BoardStyle,
         highlightsWinningPath: Bool,
+        recap: PlayedGame? = nil,
         onPlayAgain: @escaping () -> Void,
         onChangeSetup: @escaping () -> Void
     ) {
         self.state = state
         self.configuration = configuration
+        self.recap = recap
         self.onPlayAgain = onPlayAgain
         self.onChangeSetup = onChangeSetup
         _style = State(initialValue: initialStyle)
@@ -151,14 +156,31 @@ struct ResultSheet: View {
     }
 
     private var actions: some View {
+        actionButtons
+            .sheet(item: $recapping) { game in
+                ReplayView(record: game.record, names: game.names)
+            }
+    }
+
+    private var actionButtons: some View {
         VStack(spacing: 10) {
-            if let shareURL {
-                ShareLink(item: shareURL) {
-                    Label("Share Image", systemImage: "square.and.arrow.up")
-                        .frame(maxWidth: .infinity)
+            HStack(spacing: 10) {
+                if let shareURL {
+                    ShareLink(item: shareURL) {
+                        Label("Share Image", systemImage: "square.and.arrow.up")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .prominentAction()
+                    .controlSize(.large)
                 }
-                .prominentAction()
-                .controlSize(.large)
+                if let recap {
+                    Button { recapping = recap } label: {
+                        Label("Recap Game", systemImage: "play.rectangle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .prominentAction()
+                    .controlSize(.large)
+                }
             }
             Button {
                 dismiss()

@@ -229,12 +229,16 @@ struct TrainingScreen: View {
                 NavigationLink {
                     AgentDetailView(agentID: agent.id, run: run)
                 } label: {
+                    Label {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(agent.name).font(.headline)
                         Text(agent.summary).font(.footnote).foregroundStyle(.secondary)
                         if !agent.benchmarks.isEmpty {
                             Text(benchmarkLine(agent)).font(.footnote.monospacedDigit()).foregroundStyle(.secondary)
                         }
+                    }
+                    } icon: {
+                        Image(systemName: agent.symbolName).foregroundStyle(.tint)
                     }
                 }
                 .contextMenu { actions(for: agent) }

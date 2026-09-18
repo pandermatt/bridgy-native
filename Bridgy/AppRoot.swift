@@ -8,6 +8,8 @@ struct AppRoot: View {
     @Environment(AppModel.self) private var model
     @State private var showingWelcome = false
     @State private var tab: AppTab = .play
+    /// A saved agent picked in the sidebar, shown in place of the section.
+    @State private var sidebarAgent: UUID?
     @State private var boardSide: CGFloat = 320
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -49,6 +51,7 @@ struct AppRoot: View {
             // game on any switch to Play, and a request for Play usually comes
             // with a game just started for it.
             if tab == .play, requested != .play { model.parkSession() }
+            sidebarAgent = nil
             tab = requested
             model.requestedTab = nil
         }
@@ -92,33 +95,66 @@ struct AppRoot: View {
         #endif
     }
 
+    /// What the sidebar has selected: a section, or one saved agent.
+    private enum SidebarItem: Hashable {
+        case tab(AppTab)
+        case agent(UUID)
+    }
+
+    private var sidebarSelection: Binding<SidebarItem?> {
+        Binding(
+            get: { sidebarAgent.map(SidebarItem.agent) ?? .tab(tab) },
+            set: { selected in
+                switch selected {
+                case .tab(let new)?:
+                    sidebarAgent = nil
+                    tabSelection.wrappedValue = new
+                case .agent(let id)?:
+                    if tab == .play { model.parkSession() }
+                    sidebarAgent = id
+                case nil:
+                    break
+                }
+            }
+        )
+    }
+
     private var split: some View {
         NavigationSplitView {
-            List(selection: Binding<AppTab?>(get: { tab }, set: { if let new = $0 { tabSelection.wrappedValue = new } })) {
+            List(selection: sidebarSelection) {
                 Section {
                     ForEach(AppTab.sidebar) { item in
-                        Label(item.title, systemImage: item.symbol).tag(item)
+                        Label(item.title, systemImage: item.symbol).tag(SidebarItem.tab(item))
                     }
                 }
-                if !model.agents.agents.isEmpty || model.training.isRunning {
+                if !model.agents.agents.isEmpty {
                     Section("Agents") {
                         ForEach(model.agents.agents) { agent in
-                            Label(agent.name, systemImage: "brain")
+                            Label(agent.name, systemImage: agent.symbolName)
+                                .tag(SidebarItem.agent(agent.id))
                         }
-                        .selectionDisabled()
                     }
                 }
             }
             .navigationTitle("Bridgy")
             .navigationSplitViewColumnWidth(min: 180, ideal: 210)
         } detail: {
-            switch tab {
-            case .play: PlayTab()
-            case .lab: LabScreen()
-            case .agents: NavigationStack { TrainingScreen(run: model.training) }
-            case .rules: NavigationStack { HowToPlayScreen() }
-            case .settings: NavigationStack { SettingsScreen() }
+            if let id = sidebarAgent {
+                NavigationStack { AgentDetailView(agentID: id, run: model.training) }
+                    .id(id)
+            } else {
+                switch tab {
+                case .play: PlayTab()
+                case .lab: LabScreen()
+                case .agents: NavigationStack { TrainingScreen(run: model.training) }
+                case .rules: NavigationStack { HowToPlayScreen() }
+                case .settings: NavigationStack { SettingsScreen() }
+                }
             }
+        }
+        // A deleted agent takes its page with it.
+        .onChange(of: model.agents.agents.map(\.id)) { _, ids in
+            if let id = sidebarAgent, !ids.contains(id) { sidebarAgent = nil }
         }
     }
 
@@ -190,6 +226,9 @@ enum AppTab: String, Hashable, Identifiable {
 /// away with it.
 struct PlayTab: View {
     @Environment(AppModel.self) private var model
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
     @State private var showingInspector = PlayTab.inspectorByDefault
 
     private static var inspectorByDefault: Bool {
@@ -214,7 +253,14 @@ struct PlayTab: View {
         )) {
             if let session = model.session {
                 #if os(iOS)
-                NavigationStack { GameInspector(session: session) }
+                // A sheet on iPhone gets its own stack for a title and Done;
+                // beside the board on iPad it must not, or it takes over the
+                // game's navigation bar.
+                if sizeClass == .compact {
+                    NavigationStack { GameInspector(session: session) }
+                } else {
+                    GameInspector(session: session)
+                }
                 #else
                 GameInspector(session: session)
                 #endif

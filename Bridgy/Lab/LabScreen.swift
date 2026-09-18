@@ -238,7 +238,7 @@ struct NewExperimentSheet: View {
                             Text(agent.name)
                             Text(agent.summary).font(.caption).foregroundStyle(.secondary)
                         }
-                    } icon: { Image(systemName: "brain") }
+                    } icon: { Image(systemName: agent.symbolName) }
                 }
             }
         }
