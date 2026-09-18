@@ -5,22 +5,27 @@ import CoreTransferable
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// A report or the raw games, built only when shared.
-struct ExperimentReportFile: Transferable {
-    enum Format { case markdown, csv }
-    let analysis: ExperimentAnalysis
-    let format: Format
+/// A finished export, ready for the save panel.
+struct ExportedFile: FileDocument {
+    static let readableContentTypes: [UTType] = [.pdf, .plainText, .commaSeparatedText]
+    let data: Data
+    let contentType: UTType
+    let filename: String
 
-    static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(exportedContentType: .plainText) { file in
-            let name = file.analysis.experiment.name.replacingOccurrences(of: "/", with: "-")
-            let url = URL.temporaryDirectory.appendingPathComponent(
-                file.format == .markdown ? "\(name).md" : "\(name) games.csv"
-            )
-            let text = file.format == .markdown ? ReportWriter.markdown(file.analysis) : ReportWriter.csv(file.analysis)
-            try Data(text.utf8).write(to: url, options: .atomic)
-            return SentTransferredFile(url)
-        }
+    init(data: Data, contentType: UTType, filename: String) {
+        self.data = data
+        self.contentType = contentType
+        self.filename = filename
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        data = configuration.file.regularFileContents ?? Data()
+        contentType = configuration.contentType
+        filename = configuration.file.filename ?? "Export"
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: data)
     }
 }
 
@@ -30,6 +35,7 @@ struct ExperimentDetail: View {
     let id: UUID
     @Environment(AppModel.self) private var model
     @State private var page: Page = .overview
+    @State private var exporting: ExportedFile?
 
     enum Page: String, CaseIterable, Identifiable {
         case overview = "Overview", games = "Games", statistics = "Statistics", findings = "Findings"
@@ -49,6 +55,12 @@ struct ExperimentDetail: View {
                 // Tells Siri which experiment is on screen, so "summarise
                 // this" gets this report.
                 .appEntityIdentifier(EntityIdentifier(for: ExperimentEntity.self, identifier: id))
+                .fileExporter(
+                    isPresented: Binding(get: { exporting != nil }, set: { if !$0 { exporting = nil } }),
+                    document: exporting,
+                    contentType: exporting?.contentType ?? .plainText,
+                    defaultFilename: exporting?.filename
+                ) { _ in exporting = nil }
         } else {
             ContentUnavailableView("Experiment deleted", systemImage: "flask")
         }
@@ -123,14 +135,9 @@ struct ExperimentDetail: View {
     private func toolbar(_ experiment: Experiment, analysis: ExperimentAnalysis) -> some ToolbarContent {
         ToolbarItem(placement: .secondaryAction) {
             Menu {
-                ShareLink(item: ExperimentReportFile(analysis: analysis, format: .markdown),
-                          preview: SharePreview("\(experiment.name) report")) {
-                    Label("Report (Markdown)", systemImage: "doc.richtext")
-                }
-                ShareLink(item: ExperimentReportFile(analysis: analysis, format: .csv),
-                          preview: SharePreview("\(experiment.name) games")) {
-                    Label("All Games (CSV)", systemImage: "tablecells")
-                }
+                Button { export(.pdf, analysis) } label: { Label("Report (PDF)…", systemImage: "doc.text") }
+                Button { export(.markdown, analysis) } label: { Label("Report (Markdown)…", systemImage: "doc.richtext") }
+                Button { export(.csv, analysis) } label: { Label("All Games (CSV)…", systemImage: "tablecells") }
             } label: {
                 Label("Export", systemImage: "square.and.arrow.up")
             }
@@ -148,6 +155,26 @@ struct ExperimentDetail: View {
                 }
                 .disabled(model.runner.isRunning)
             }
+        }
+    }
+
+    // MARK: - Export
+
+    private enum ExportFormat { case pdf, markdown, csv }
+
+    private func export(_ format: ExportFormat, _ analysis: ExperimentAnalysis) {
+        let name = analysis.experiment.name.replacingOccurrences(of: "/", with: "-")
+        switch format {
+        case .pdf:
+            guard let url = try? ReportDocument.pdf(analysis, theme: model.settings.theme),
+                  let data = try? Data(contentsOf: url) else { return }
+            exporting = ExportedFile(data: data, contentType: .pdf, filename: "\(name).pdf")
+        case .markdown:
+            exporting = ExportedFile(data: Data(ReportWriter.markdown(analysis).utf8),
+                                     contentType: .plainText, filename: "\(name).md")
+        case .csv:
+            exporting = ExportedFile(data: Data(ReportWriter.csv(analysis).utf8),
+                                     contentType: .commaSeparatedText, filename: "\(name) games.csv")
         }
     }
 
