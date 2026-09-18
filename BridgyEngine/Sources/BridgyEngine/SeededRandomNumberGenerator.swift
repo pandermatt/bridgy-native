@@ -16,6 +16,15 @@ public struct SeededRandomNumberGenerator: RandomNumberGenerator, Sendable {
         self.init(seed: UInt64.random(in: UInt64.min...UInt64.max))
     }
 
+    /// Combines a base seed with an index into an independent seed, so games
+    /// played in parallel each get their own stream without sharing one.
+    public static func mix(_ seed: UInt64, _ index: UInt64) -> UInt64 {
+        var z = seed &+ (index &+ 1) &* 0x9E37_79B9_7F4A_7C15
+        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+        return z ^ (z >> 31)
+    }
+
     public mutating func next() -> UInt64 {
         state &+= 0x9E37_79B9_7F4A_7C15
         var z = state

@@ -10,7 +10,17 @@ let package = Package(
     targets: [
         .target(
             name: "BridgyEngine",
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+                // Optimised even in Debug. The engines are tight loops over
+                // arrays, and unoptimised they run about a hundred times slower —
+                // a random 35×35 game went from half a millisecond to over fifty,
+                // and every search and tournament paid the same. Running the app
+                // from Xcode is a Debug build, so without this "the game is slow"
+                // was mostly the build configuration. The app itself stays
+                // debuggable; only this package is optimised.
+                .unsafeFlags(["-O"], .when(configuration: .debug))
+            ]
         ),
         .testTarget(
             name: "BridgyEngineTests",

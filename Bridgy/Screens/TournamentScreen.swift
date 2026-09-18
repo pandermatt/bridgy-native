@@ -7,6 +7,9 @@ struct TournamentScreen: View {
     @Environment(AppModel.self) private var model
     @State private var run = TournamentRun()
     @State private var focus: String?
+    /// Which colour the size chart shows. Bridg-It is not colour-symmetric,
+    /// so the combined figure hides the most important fact about Perfect.
+    @State private var colour: Player?
     @State private var selectedGames: Int?
 
     var body: some View {
@@ -143,6 +146,17 @@ struct TournamentScreen: View {
 
     // MARK: - Board size
 
+    private var sizeFooter: String {
+        switch colour {
+        case .blue?:
+            "Moving first. Down can always force a win, and Perfect plays that strategy, so it should never lose here."
+        case .red?:
+            "Moving second. No strategy guarantees a win for Across, so here Perfect plays as Expert does."
+        case nil:
+            "How each engine holds up as the board grows. Split by colour to see where losses come from; pick an engine for its confidence intervals."
+        }
+    }
+
     private func sizeSection(_ analysis: TournamentAnalysis) -> some View {
         Section {
             Picker("Show intervals for", selection: $focus) {
@@ -153,8 +167,15 @@ struct TournamentScreen: View {
             }
             .pickerStyle(.menu)
 
+            Picker("Playing", selection: $colour) {
+                Text("Both").tag(Player?.none)
+                Text("As Down").tag(Player?.some(.blue))
+                Text("As Across").tag(Player?.some(.red))
+            }
+            .pickerStyle(.segmented)
+
             Chart {
-                ForEach(analysis.sizePoints) { point in
+                ForEach(analysis.sizePoints(as: colour)) { point in
                     LineMark(
                         x: .value("Board size", point.size),
                         y: .value("Win rate", point.record.rate)
@@ -199,7 +220,7 @@ struct TournamentScreen: View {
         } header: {
             Text("Win rate by board size")
         } footer: {
-            Text("How each engine holds up as the board grows. Pick an engine to see its confidence intervals.")
+            Text(sizeFooter)
         }
     }
 
@@ -304,8 +325,8 @@ struct TournamentScreen: View {
 
     private var exportSection: some View {
         Section {
-            if let url = run.exportURL() {
-                ShareLink(item: url) {
+            if let report = run.report {
+                ShareLink(item: report, preview: SharePreview("Tournament results")) {
                     Label("Export CSV", systemImage: "square.and.arrow.up")
                 }
             }

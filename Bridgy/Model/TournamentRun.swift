@@ -1,6 +1,8 @@
 import BridgyEngine
+import CoreTransferable
 import Foundation
 import Observation
+import UniformTypeIdentifiers
 
 /// Runs a tournament and publishes the analysis as it fills in.
 ///
@@ -18,8 +20,11 @@ final class TournamentRun {
     private var task: Task<Void, Never>?
     private static let publishInterval = Duration.milliseconds(120)
 
+    /// The field. Each engine is rebuilt for every board size it plays.
+    var participants: [Participant] { Tournament.defaultParticipants() }
+
     var totalGames: Int {
-        configuration.totalGames(participants: Difficulty.allCases.count)
+        configuration.totalGames(participants: participants.count)
     }
 
     var progress: Double {
@@ -30,7 +35,7 @@ final class TournamentRun {
     func start() {
         stop()
         let settings = configuration
-        let participants = Tournament.defaultParticipants(forSize: settings.maximumSize)
+        let participants = participants
         var working = TournamentAnalysis(
             participants: participants.map(\.name),
             configuration: settings
@@ -61,12 +66,23 @@ final class TournamentRun {
         isRunning = false
     }
 
-    /// Writes the report somewhere `ShareLink` can pick it up.
-    func exportURL() -> URL? {
-        guard let analysis else { return nil }
-        let url = URL.temporaryDirectory.appendingPathComponent("bridgy-tournament.csv")
-        guard let data = analysis.csv().data(using: .utf8) else { return nil }
-        try? data.write(to: url, options: .atomic)
-        return url
+    /// The current results, ready to share. Nothing is built or written until
+    /// someone actually shares it.
+    var report: TournamentReport? { analysis.map(TournamentReport.init) }
+}
+
+/// The results as a CSV file, produced only at the moment of sharing.
+///
+/// This replaced a function called from the view body that built the whole
+/// CSV and wrote it to disk on the main thread every time the screen refreshed
+/// — about eight times a second while a tournament ran.
+struct TournamentReport: Transferable {
+    let analysis: TournamentAnalysis
+
+    static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(exportedContentType: .commaSeparatedText) { report in
+            Data(report.analysis.csv().utf8)
+        }
+        .suggestedFileName("bridgy-tournament.csv")
     }
 }

@@ -75,31 +75,49 @@ struct WatchPace: Hashable, Codable, Sendable {
     static let `default` = WatchPace(movesPerSecond: 2, allowsFullThinking: false)
     static let range: ClosedRange<Double> = 0.5...15
 
+    /// Stands for "no pause at all". A plain number rather than infinity, which
+    /// neither JSON nor the settings store will take.
+    static let instantRate: Double = 1_000
+
+    /// No artificial pause between moves: as fast as the engines can play.
+    var isInstant: Bool { movesPerSecond >= Self.instantRate }
+
     /// Time allotted per move.
     var interval: Duration {
-        .milliseconds(Int((1_000 / max(movesPerSecond, 0.01)).rounded()))
+        isInstant ? .zero : .milliseconds(Int((1_000 / max(movesPerSecond, 0.01)).rounded()))
     }
 
     /// Budget handed to a searching engine, or `nil` to let it think fully.
+    ///
+    /// Floored, so that Instant removes the pause without also removing the
+    /// thinking — a zero budget would turn Expert into a random player.
     var thinkingBudget: Duration? {
-        allowsFullThinking ? nil : interval
+        allowsFullThinking ? nil : max(interval, .milliseconds(20))
     }
 
     var rateDescription: String {
-        movesPerSecond < 1
+        if isInstant { return "Instant" }
+        return movesPerSecond < 1
             ? String(format: "%.1f moves per second", movesPerSecond)
             : String(format: "%.0f moves per second", movesPerSecond)
     }
 
     /// The slider works in log space so the slow end stays adjustable — the
-    /// difference between 0.5/s and 1/s matters as much as 10/s and 15/s.
+    /// difference between 0.5/s and 1/s matters as much as 10/s and 15/s. One
+    /// extra step past the fastest rate is Instant.
     var sliderPosition: Double {
-        get { log2(movesPerSecond) }
-        set { movesPerSecond = min(Self.range.upperBound, max(Self.range.lowerBound, pow(2, newValue))) }
+        get { isInstant ? Self.sliderRange.upperBound : log2(movesPerSecond) }
+        set {
+            if newValue > log2(Self.range.upperBound) + 0.5 {
+                movesPerSecond = Self.instantRate
+            } else {
+                movesPerSecond = min(Self.range.upperBound, max(Self.range.lowerBound, pow(2, newValue)))
+            }
+        }
     }
 
     static var sliderRange: ClosedRange<Double> {
-        log2(range.lowerBound)...log2(range.upperBound)
+        log2(range.lowerBound)...(log2(range.upperBound) + 1)
     }
 }
 

@@ -4,6 +4,43 @@ import Testing
 
 @Suite("Timing", .enabled(if: ProcessInfo.processInfo.environment["BRIDGY_TIMING"] != nil))
 struct TimingDiagnostics {
+    private func ms(_ d: Duration) -> Double {
+        Double(d.components.seconds) * 1000 + Double(d.components.attoseconds) / 1e15
+    }
+
+    /// The claim "random vs random should be instant", measured.
+    @Test("Time random against random")
+    func randomCost() {
+        let clock = ContinuousClock()
+        print("\nrandom vs random, 20 games each")
+        for size in [6, 12, 35] {
+            var rng = SeededRandomNumberGenerator(seed: 1)
+            var moves = 0
+            let elapsed = clock.measure {
+                for _ in 0..<20 {
+                    moves += Match.play(size: size, blue: RandomEngine(), red: RandomEngine(), rng: &rng).moveCount
+                }
+            }
+            print(String(format: "  size %2d: %8.2f ms per game, %6.2f µs per move",
+                         size, ms(elapsed) / 20, ms(elapsed) * 1000 / Double(max(moves, 1))))
+        }
+    }
+
+    /// The app's default tournament, end to end.
+    @Test("Time the default tournament")
+    func tournamentCost() async {
+        let configuration = TournamentConfiguration(minimumSize: 4, maximumSize: 6, gamesPerColour: 3)
+        let clock = ContinuousClock()
+        var games = 0
+        let elapsed = await clock.measure {
+            for await _ in Tournament.stream(
+                configuration: configuration,
+                participants: Tournament.defaultParticipants(forSize: 6)
+            ) { games += 1 }
+        }
+        print(String(format: "\ndefault tournament: %d games in %.0f ms", games, ms(elapsed)))
+    }
+
     @Test("Time a full Perfect game at several sizes")
     func perfectCost() {
         let clock = ContinuousClock()

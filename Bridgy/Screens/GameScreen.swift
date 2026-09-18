@@ -126,6 +126,7 @@ struct GameScreen: View {
     /// up with the ask.
     private var paceLabel: String {
         let requested = model.settings.watchPace
+        guard !requested.isInstant else { return requested.rateDescription }
         guard let achieved = session.achievedMovesPerSecond,
               achieved < requested.movesPerSecond * 0.8 else {
             return requested.rateDescription

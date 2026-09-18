@@ -52,6 +52,12 @@ public struct TournamentAnalysis: Sendable {
     private var sizePlayed: [Int: [Int]] = [:]
     private var blueWins: [Int: Int] = [:]
     private var blueGames: [Int: Int] = [:]
+    /// Wins and games by colour, then size, then participant. Bridg-It is not
+    /// colour-symmetric — the first player can always win — so a single rate
+    /// hides the thing that matters most: Perfect never loses as Down and has
+    /// no perfect strategy as Across, and only the split shows that.
+    private var sideWins: [Player: [Int: [Int]]] = [:]
+    private var sidePlayed: [Player: [Int: [Int]]] = [:]
     /// Keeps the rating chart to roughly 120 points per engine however long the run.
     private let sampleEvery: Int
 
@@ -69,6 +75,10 @@ public struct TournamentAnalysis: Sendable {
             sizePlayed[size] = Array(repeating: 0, count: count)
             blueWins[size] = 0
             blueGames[size] = 0
+            for side in Player.allCases {
+                sideWins[side, default: [:]][size] = Array(repeating: 0, count: count)
+                sidePlayed[side, default: [:]][size] = Array(repeating: 0, count: count)
+            }
         }
         appendEloSample()
     }
@@ -84,6 +94,10 @@ public struct TournamentAnalysis: Sendable {
         sizeWins[outcome.size]?[winner] += 1
         sizePlayed[outcome.size]?[winner] += 1
         sizePlayed[outcome.size]?[loser] += 1
+
+        sidePlayed[.blue]?[outcome.size]?[outcome.blue] += 1
+        sidePlayed[.red]?[outcome.size]?[outcome.red] += 1
+        sideWins[outcome.winner]?[outcome.size]?[winner] += 1
 
         blueGames[outcome.size, default: 0] += 1
         if outcome.winner == .blue { blueWins[outcome.size, default: 0] += 1 }
@@ -125,6 +139,24 @@ public struct TournamentAnalysis: Sendable {
         )
     }
 
+    /// One participant's record at one size playing one colour, or both colours
+    /// together when `side` is nil.
+    public func record(of participant: Int, atSize size: Int, as side: Player?) -> Record {
+        guard let side else { return record(of: participant, atSize: size) }
+        return Record(
+            wins: sideWins[side]?[size]?[participant] ?? 0,
+            games: sidePlayed[side]?[size]?[participant] ?? 0
+        )
+    }
+
+    /// One participant's record over every size, playing one colour.
+    public func record(of participant: Int, as side: Player) -> Record {
+        configuration.sizes.reduce(Record(wins: 0, games: 0)) { total, size in
+            let r = record(of: participant, atSize: size, as: side)
+            return Record(wins: total.wins + r.wins, games: total.games + r.games)
+        }
+    }
+
     public func firstPlayerRecord(atSize size: Int) -> Record {
         Record(wins: blueWins[size] ?? 0, games: blueGames[size] ?? 0)
     }
@@ -145,11 +177,14 @@ public struct TournamentAnalysis: Sendable {
             .sorted { $0.1 > $1.1 }
     }
 
-    public var sizePoints: [SizePoint] {
+    public var sizePoints: [SizePoint] { sizePoints(as: nil) }
+
+    /// Win rate by board size, for one colour or both.
+    public func sizePoints(as side: Player?) -> [SizePoint] {
         var points: [SizePoint] = []
         for (sizeIndex, size) in configuration.sizes.enumerated() {
             for (index, name) in participants.enumerated() {
-                let record = self.record(of: index, atSize: size)
+                let record = self.record(of: index, atSize: size, as: side)
                 guard !record.isEmpty else { continue }
                 points.append(
                     SizePoint(
@@ -224,6 +259,19 @@ public struct TournamentAnalysis: Sendable {
             lines.append(name + ";" + cells.joined(separator: ";"))
         }
         lines.append("")
+
+        for side in Player.allCases {
+            lines.append("Win rate by board size, playing \(side == .blue ? "Down (first)" : "Across (second)")")
+            lines.append("Engine;" + configuration.sizes.map { "\($0)x\($0)" }.joined(separator: ";"))
+            for (index, name) in participants.enumerated() {
+                let cells = configuration.sizes.map { size -> String in
+                    let r = record(of: index, atSize: size, as: side)
+                    return String(format: "%.3f [%.3f, %.3f] n=%d", r.rate, r.interval.low, r.interval.high, r.games)
+                }
+                lines.append(name + ";" + cells.joined(separator: ";"))
+            }
+            lines.append("")
+        }
 
         lines.append("First-player advantage (first player wins, all pairings)")
         lines.append("Board size;First-player wins;Games;Rate;CI low;CI high")

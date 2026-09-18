@@ -173,3 +173,61 @@ struct TournamentStreamTests {
         #expect(count < configuration.totalGames(participants: participants.count))
     }
 }
+
+@Suite("Parallel tournament")
+struct ParallelTournamentTests {
+    private func collect(parallelism: Int) async -> [Tournament.Outcome] {
+        let configuration = TournamentConfiguration(minimumSize: 3, maximumSize: 5, gamesPerColour: 2)
+        var outcomes: [Tournament.Outcome] = []
+        for await outcome in Tournament.stream(
+            configuration: configuration,
+            participants: [
+                Participant(name: "Random", engine: RandomEngine()),
+                Participant(name: "Greedy", engine: GreedyEngine(strategy: .balanced)),
+                Participant(name: "Path", engine: ShortestPathEngine())
+            ],
+            seed: 42,
+            parallelism: parallelism
+        ) { outcomes.append(outcome) }
+        return outcomes
+    }
+
+    /// Running on many cores must not change a single result, or the order
+    /// they arrive in — Elo history depends on that order.
+    @Test("Many cores give exactly the results one core gives, in the same order")
+    func parallelMatchesSerial() async {
+        let serial = await collect(parallelism: 1)
+        let parallel = await collect(parallelism: 8)
+        #expect(!serial.isEmpty)
+        #expect(serial == parallel)
+        #expect(parallel.map(\.gameIndex) == Array(0..<parallel.count))
+    }
+}
+
+@Suite("Results by colour")
+struct ColourSplitTests {
+    /// The split has to add back up to the combined figure, and Perfect's Down
+    /// column has to be spotless — that is the whole reason the split exists.
+    @Test("Down and Across add up to the total, and Perfect never loses as Down")
+    func splitIsConsistent() async {
+        let configuration = TournamentConfiguration(minimumSize: 3, maximumSize: 6, gamesPerColour: 2)
+        let participants = Tournament.defaultParticipants()
+        var analysis = TournamentAnalysis(participants: participants.map(\.name), configuration: configuration)
+        for await outcome in Tournament.stream(configuration: configuration, participants: participants) {
+            analysis.record(outcome)
+        }
+        for index in participants.indices {
+            for size in configuration.sizes {
+                let both = analysis.record(of: index, atSize: size)
+                let down = analysis.record(of: index, atSize: size, as: .blue)
+                let across = analysis.record(of: index, atSize: size, as: .red)
+                #expect(down.wins + across.wins == both.wins)
+                #expect(down.games + across.games == both.games)
+            }
+        }
+        let perfect = try! #require(participants.firstIndex { $0.name == Difficulty.perfect.displayName })
+        let asDown = analysis.record(of: perfect, as: .blue)
+        #expect(asDown.games > 0)
+        #expect(asDown.wins == asDown.games, "Perfect lost \(asDown.games - asDown.wins) games as Down")
+    }
+}

@@ -270,6 +270,16 @@ final class GameSession {
 
         let watching = configuration.isWatchOnly
         let budget = pace?.thinkingBudget
+
+        if watching, pace?.isInstant == true,
+           case .computer(let blueLevel) = configuration.blue,
+           case .computer(let redLevel) = configuration.red {
+            playInstantly(
+                blue: engine(for: blueLevel, budget: budget),
+                red: engine(for: redLevel, budget: budget)
+            )
+            return
+        }
         let engine = engine(for: level, budget: budget)
         let snapshot = state
         // A beat before a computer move, so its reply does not land in the same
@@ -292,6 +302,63 @@ final class GameSession {
             guard let chosen, self.state.isLegal(chosen) else { return }
             self.commit(chosen)
         }
+    }
+
+    // MARK: - Instant
+
+    /// Plays as fast as the engines allow, a frame's worth of moves at a time.
+    ///
+    /// With no pause, one SwiftUI update per move becomes the limit: a random
+    /// 35×35 game is over two thousand redraws of a board that is itself two
+    /// thousand cells. So moves are played off the main actor for about one
+    /// frame, then committed together, and the board redraws once per batch.
+    private func playInstantly(blue: any Engine, red: any Engine) {
+        let snapshot = state
+        let seed = UInt64.random(in: .min ... .max)
+        thinkingTask = Task { [weak self] in
+            let batch = await Self.playBatch(blue: blue, red: red, state: snapshot, seed: seed)
+            guard let self, !Task.isCancelled, !batch.isEmpty else { return }
+            self.commitBatch(batch)
+        }
+    }
+
+    private nonisolated static func playBatch(
+        blue: any Engine,
+        red: any Engine,
+        state: GameState,
+        seed: UInt64,
+        frame: Duration = .milliseconds(14)
+    ) async -> [Move] {
+        var rng = SeededRandomNumberGenerator(seed: seed)
+        var working = state
+        var played: [Move] = []
+        let deadline = ContinuousClock.now + frame
+        repeat {
+            let engine: any Engine = working.current == .blue ? blue : red
+            guard !Task.isCancelled,
+                  let move = engine.chooseMove(in: working, rng: &rng),
+                  working.apply(move)
+            else { break }
+            played.append(move)
+        } while !working.isOver && ContinuousClock.now < deadline
+        return played
+    }
+
+    private func commitBatch(_ moves: [Move]) {
+        for move in moves where !state.isOver {
+            guard state.apply(move) else { break }
+        }
+        hintMove = nil
+        if state.isOver {
+            if settings.soundEnabled { sound.playWin() }
+            hasFinished = true
+            captureWinningPath()
+            store.clear()
+        } else {
+            scheduleSave()
+        }
+        refreshReadout()
+        advance()
     }
 
     /// Runs the search off the main actor, inside the caller's task so that
