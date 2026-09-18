@@ -148,6 +148,7 @@ struct AppRoot: View {
                 switch tab {
                 case .play: PlayTab()
                 case .lab: LabScreen()
+                case .stats: NavigationStack { StatsScreen() }
                 case .agents: NavigationStack { TrainingScreen(run: model.training) }
                 case .rules: NavigationStack { HowToPlayScreen() }
                 case .settings: NavigationStack { SettingsScreen() }
@@ -187,13 +188,14 @@ struct AppRoot: View {
 }
 
 enum AppTab: String, Hashable, Identifiable {
-    case play, lab, agents, rules, settings
+    case play, stats, lab, agents, rules, settings
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .play: "Play"
+        case .stats: "Stats"
         case .lab: "Lab"
         case .agents: "Agents"
         case .rules: "Rules"
@@ -204,6 +206,7 @@ enum AppTab: String, Hashable, Identifiable {
     var symbol: String {
         switch self {
         case .play: "play.circle"
+        case .stats: "chart.bar"
         case .lab: "flask"
         case .agents: "brain.head.profile"
         case .rules: "questionmark.circle"
@@ -214,9 +217,9 @@ enum AppTab: String, Hashable, Identifiable {
     /// The Mac keeps Settings in its own window, under the app menu.
     static var sidebar: [AppTab] {
         #if os(macOS)
-        [.play, .lab, .agents, .rules]
+        [.play, .stats, .lab, .agents, .rules]
         #else
-        [.play, .lab, .agents, .rules, .settings]
+        [.play, .stats, .lab, .agents, .rules, .settings]
         #endif
     }
 }

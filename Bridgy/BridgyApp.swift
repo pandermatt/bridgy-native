@@ -30,7 +30,7 @@ struct BridgyApp: App {
                     .disabled(model.session?.canUndo != true)
             }
             CommandGroup(after: .sidebar) {
-                ForEach(Array(AppTab.sidebar.prefix(4).enumerated()), id: \.element) { index, tab in
+                ForEach(Array(AppTab.sidebar.prefix(5).enumerated()), id: \.element) { index, tab in
                     Button(tab.title) { model.requestedTab = tab }
                         .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
                 }

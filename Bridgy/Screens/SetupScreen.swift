@@ -142,26 +142,17 @@ struct SetupScreen: View {
     private var recentGamesSection: some View {
         Section {
             ForEach(model.history.games.prefix(3)) { game in
-                Button { replaying = game } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(game.title).font(.headline)
-                            Text("\(game.record.size)×\(game.record.size) · \(game.winnerName) won as \(game.record.winner.displayName) · \(game.date.formatted(.relative(presentation: .named)))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Text("\(game.record.length)").font(.title3.monospacedDigit().weight(.semibold))
-                        Text("moves").font(.caption).foregroundStyle(.secondary)
-                    }
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
+                PlayedGameRow(game: game) { replaying = game }
                 .swipeActions {
                     Button(role: .destructive) { model.history.delete(game) } label: {
                         Label("Delete", systemImage: "trash")
                     }
                 }
+            }
+            NavigationLink {
+                StatsScreen()
+            } label: {
+                Label("Your Stats and All Games", systemImage: "chart.bar")
             }
         } header: {
             Text("Recent games")

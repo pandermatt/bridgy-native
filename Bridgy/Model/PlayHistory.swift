@@ -23,7 +23,7 @@ struct PlayedGame: Codable, Identifiable, Hashable, Sendable {
 final class PlayHistory {
     private(set) var games: [PlayedGame] = []
     private let url: URL
-    private static let limit = 50
+    private static let limit = 1_000
 
     init() {
         let base = (try? FileManager.default.url(
