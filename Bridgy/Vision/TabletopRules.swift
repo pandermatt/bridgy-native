@@ -1,6 +1,7 @@
 #if os(visionOS)
 import BridgyEngine
 import Foundation
+import Observation
 import Synchronization
 import TabletopKit
 
@@ -39,27 +40,35 @@ final class PlayableGaps: Sendable {
 /// interaction layer. A drag is proposed, `validateAction` asks the engine, and
 /// TabletopKit rolls the bridge back into the tray on a no.
 @MainActor
+@Observable
 final class BridgyRules {
 
+    /// Observed by the status panel floating over the table.
     private(set) var state: GameState
     /// Who is holding each seat, so a computer can answer a human's bridge.
-    private let seats: [BoardSide: Seat]
-    private let slotIDByCell: [Int: EquipmentIdentifier]
-    private let cellBySlotID: [EquipmentIdentifier: Int]
-    private let ownerByPieceID: [EquipmentIdentifier: BoardSide]
+    @ObservationIgnored private let seats: [BoardSide: Seat]
+    @ObservationIgnored private let slotIDByCell: [Int: EquipmentIdentifier]
+    @ObservationIgnored private let cellBySlotID: [EquipmentIdentifier: Int]
+    @ObservationIgnored private let ownerByPieceID: [EquipmentIdentifier: BoardSide]
 
     /// Pieces still in the tray, per side, in the order they will be used.
-    private var spare: [BoardSide: [EquipmentIdentifier]]
+    @ObservationIgnored private var spare: [BoardSide: [EquipmentIdentifier]]
+    /// The full piles as dealt, so a new game can put them back.
+    @ObservationIgnored private let dealt: [BoardSide: [EquipmentIdentifier]]
 
-    private weak var game: TabletopGame?
-    private var engines: [BoardSide: any Engine] = [:]
-    private var rng = SeededRandomNumberGenerator(seed: 0x8123)
+    /// The empty table, bookmarked before the first move so a new game can
+    /// return every bridge to its pile in one step.
+    private static let freshTable = StateBookmarkIdentifier(1)
+
+    @ObservationIgnored private weak var game: TabletopGame?
+    @ObservationIgnored private var engines: [BoardSide: any Engine] = [:]
+    @ObservationIgnored private var rng = SeededRandomNumberGenerator(seed: 0x8123)
 
     /// Called after every confirmed move so the scene can redraw.
-    var onChange: ((GameState) -> Void)?
+    @ObservationIgnored var onChange: ((GameState) -> Void)?
 
     /// Read by the interaction delegate, which has no actor to read from.
-    let gaps = PlayableGaps()
+    @ObservationIgnored let gaps = PlayableGaps()
 
     init(board: Board, seats: [BoardSide: Seat], slots: [BridgeSlot], pieces: [BridgePiece]) {
         self.state = GameState(board: board)
@@ -67,7 +76,9 @@ final class BridgyRules {
         self.slotIDByCell = Dictionary(uniqueKeysWithValues: slots.map { ($0.cell, $0.id) })
         self.cellBySlotID = Dictionary(uniqueKeysWithValues: slots.map { ($0.id, $0.cell) })
         self.ownerByPieceID = Dictionary(uniqueKeysWithValues: pieces.map { ($0.id, $0.owner) })
-        self.spare = Dictionary(grouping: pieces, by: \.owner).mapValues { $0.map(\.id) }
+        let piles = Dictionary(grouping: pieces, by: \.owner).mapValues { $0.map(\.id) }
+        self.spare = piles
+        self.dealt = piles
 
         for side in BoardSide.allCases {
             if case .computer(let level) = seats[side] {
@@ -79,9 +90,28 @@ final class BridgyRules {
     func attach(to game: TabletopGame) {
         self.game = game
         game.addObserver(self)
+        game.addAction(.createBookmark(id: Self.freshTable))
         republishGaps()
         startIfComputerLeads()
     }
+
+    /// Back to an empty table, every bridge in its pile, same seats.
+    func playAgain() {
+        guard let game else { return }
+        state = GameState(board: state.board)
+        spare = dealt
+        republishGaps()
+        game.jumpToBookmark(StateBookmark(id: Self.freshTable))
+        startIfComputerLeads()
+    }
+
+    /// The side a person is playing, when exactly one is.
+    var humanSide: BoardSide? {
+        let humans = BoardSide.allCases.filter { seats[$0]?.isComputer == false }
+        return humans.count == 1 ? humans.first : nil
+    }
+
+    func isComputer(_ side: BoardSide) -> Bool { seats[side]?.isComputer == true }
 
     private func republishGaps() {
         var destinations: [BoardSide: [EquipmentIdentifier]] = [:]

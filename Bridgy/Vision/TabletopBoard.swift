@@ -39,11 +39,12 @@ struct BoardMetrics {
     /// A bridge is two lattice units end to end.
     var bridgeLength: Double { unit * 2 }
 
-    /// Reuses the 2D stroke weight so a bridge is as thick, relative to the
-    /// board, as the one on the phone.
-    func bridgeThickness(_ style: BoardStyle) -> Double {
-        unit * Double(style.strokeLatticeWidth)
-    }
+    /// A bridge's deck width, fixed rather than taken from the 2D style.
+    ///
+    /// The 2D styles are about how lines read on a flat screen — Bolder fills
+    /// the whole cell on purpose. In three dimensions that made every bridge a
+    /// slab, and thirty of them in a pile a tower taller than the table was wide.
+    var deckWidth: Double { unit * 0.42 }
 
     /// Derived from the lattice, NOT from `geometry.dotRadius`.
     ///
@@ -96,6 +97,12 @@ struct BoardMetrics {
         return abs(from.x - to.x) < abs(from.y - to.y)
     }
 }
+
+/// Marks the parts of the board you can pick the whole thing up by.
+///
+/// The banks, and only the banks: a bridge is TabletopKit's to move, so the
+/// move-the-board gesture must never claim one.
+struct BoardHandleComponent: Component {}
 
 // MARK: - Equipment
 
@@ -177,6 +184,7 @@ struct TabletopBoardBuilder {
     let style: BoardStyle
 
     func build() -> TabletopBoard {
+        BoardHandleComponent.registerComponent()
         let metrics = BoardMetrics(board: board)
         let root = Entity()
 
@@ -283,10 +291,10 @@ struct TabletopBoardBuilder {
         )
         var material = PhysicallyBasedMaterial()
         material.baseColor = .init(tint: UIColor(red: 0.05, green: 0.20, blue: 0.35, alpha: 1))
-        material.roughness = 0.08
-        material.metallic = 0.15
-        material.clearcoat = .init(floatLiteral: 0.9)
-        material.clearcoatRoughness = .init(floatLiteral: 0.06)
+        material.roughness = 0.22
+        material.metallic = 0.05
+        material.clearcoat = .init(floatLiteral: 0.55)
+        material.clearcoatRoughness = .init(floatLiteral: 0.18)
         let entity = ModelEntity(mesh: mesh, materials: [material])
         entity.name = "water"
         entity.addChild(shimmerEntity(metrics))
@@ -358,6 +366,10 @@ struct TabletopBoardBuilder {
             material.roughness = 0.75
             for sign in [Float(-1), Float(1)] {
                 let bank = ModelEntity(mesh: mesh, materials: [material])
+                bank.components.set(BoardHandleComponent())
+                bank.components.set(InputTargetComponent())
+                bank.components.set(HoverEffectComponent())
+                bank.generateCollisionShapes(recursive: false)
                 bank.position = alongZ
                     ? SIMD3(0, height * 0.1, sign * reach)
                     : SIMD3(sign * reach, height * 0.1, 0)
@@ -394,7 +406,7 @@ struct TabletopBoardBuilder {
         let holder = Entity()
 
         let key = DirectionalLight()
-        key.light.intensity = 2600
+        key.light.intensity = 1700
         key.light.color = .white
         key.look(at: .zero, from: SIMD3(0.6, 1.4, 0.5), relativeTo: nil)
         holder.addChild(key)
@@ -428,23 +440,27 @@ struct TabletopBoardBuilder {
         ]
     }
 
-    /// Where a spare bridge waits: stacked in a neat pile on its own shore.
+    /// Where a spare bridge waits: in a row of short piles on its own shore.
     ///
-    /// A side can play upwards of thirty bridges on a small board, and laid out
-    /// side by side that is a field of them swamping the room. Fanned into a
-    /// shallow pile they read as a supply you take the top one from, and take up
-    /// about the space of one bridge.
+    /// TabletopKit stacks equipment that overlaps, physically. Put thirty
+    /// bridges in one spot and you get a column climbing off the table; nudge
+    /// each one sideways and you get a staircase. A few short piles side by side
+    /// read as a supply and stay low enough to reach over.
     private func trayPose(
         metrics: BoardMetrics,
         side: BoardSide,
         index: Int
     ) -> TableVisualState.Pose2D {
-        let fan = metrics.unit * 0.09 * Double(index)
-        let outward = metrics.side / 2 + metrics.unit * 1.9
+        let perPile = 6
+        let piles = 6
+        let pile = Double(index / perPile % piles)
+        let spacing = metrics.deckWidth * 1.7
+        let along = (pile - Double(piles - 1) / 2) * spacing
+        let outward = metrics.side / 2 + metrics.unit * 2.4
 
         let position: TableVisualState.Point2D = side == .blue
-            ? .init(x: fan - metrics.unit, z: outward)
-            : .init(x: -outward, z: fan - metrics.unit)
+            ? .init(x: along, z: outward)
+            : .init(x: -outward, z: along)
         return .init(position: position, rotation: side == .blue ? .zero : .degrees(90))
     }
 
@@ -452,7 +468,7 @@ struct TabletopBoardBuilder {
     /// the player. The gap it lands on turns it if that crossing runs the other
     /// way.
     private func bridgeModel(metrics: BoardMetrics, player: BoardSide) -> Entity {
-        let deckWidth = Float(metrics.bridgeThickness(style))
+        let deckWidth = Float(metrics.deckWidth)
         let length = Float(metrics.bridgeLength)
         let deckHeight = deckWidth * 0.34
 

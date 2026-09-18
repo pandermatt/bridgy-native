@@ -1,7 +1,7 @@
 name: Bridgy
 
 options:
-  bundleIdPrefix: com.pandermatt
+  bundleIdPrefix: ch.pandermatt
   createIntermediateGroups: true
   deploymentTarget:
     iOS: "26.0"
@@ -26,7 +26,7 @@ targets:
         product: BridgyEngine
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.pandermatt.bridgy
+        PRODUCT_BUNDLE_IDENTIFIER: ch.pandermatt.bridgy
         PRODUCT_NAME: Bridgy
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
@@ -34,7 +34,7 @@ targets:
         SWIFT_STRICT_CONCURRENCY: complete
         GENERATE_INFOPLIST_FILE: YES
         ENABLE_USER_SCRIPT_SANDBOXING: YES
-        DEVELOPMENT_TEAM: ""
+        DEVELOPMENT_TEAM: 692NM4E836
         CODE_SIGN_STYLE: Automatic
         INFOPLIST_KEY_CFBundleDisplayName: Bridgy
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
