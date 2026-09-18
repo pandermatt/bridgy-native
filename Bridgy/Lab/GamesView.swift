@@ -160,7 +160,10 @@ struct ReplayView: View {
                     theme: model.settings.theme,
                     style: model.settings.boardStyle,
                     cap: model.settings.bridgeCap,
-                    guideDots: true
+                    guideDots: true,
+                    // Scrubbing, the halo marks the move just played; on the
+                    // final position the game is over and nothing is "last".
+                    highlightsLastMove: count < record.length
                 )
                 .aspectRatio(1, contentMode: .fit)
                 .frame(maxWidth: 520)

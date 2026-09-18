@@ -88,39 +88,35 @@ struct GameScreen: View {
     }
 
     /// What to do with a finished game, in the order you'd want it: look at
-    /// how it went, show it off, go again.
+    /// how it went, show it off, go again. One glass capsule holding three
+    /// buttons, the way the tab bar holds its tabs, rather than three big
+    /// bordered buttons competing with the board.
     private var gameOverBar: some View {
-        HStack(spacing: 10) {
-            Button {
-                analysing = finished
-            } label: {
-                Label("Analyse", systemImage: "chart.xyaxis.line")
-                    .frame(maxWidth: .infinity)
-            }
-            .prominentAction()
-            .disabled(finished == nil)
-
-            Button {
-                sharing = true
-            } label: {
-                Label("Share", systemImage: "square.and.arrow.up")
-                    .frame(maxWidth: .infinity)
-            }
-            .secondaryAction()
-
-            Button {
-                session.restart()
-            } label: {
-                Label("Play Again", systemImage: "arrow.clockwise")
-                    .frame(maxWidth: .infinity)
-            }
-            .secondaryAction()
+        HStack(spacing: 0) {
+            gameOverButton("Analyse", "chart.xyaxis.line", prominent: true) { analysing = finished }
+                .disabled(finished == nil)
+            Divider().frame(height: 22)
+            gameOverButton("Share", "square.and.arrow.up") { sharing = true }
+            Divider().frame(height: 22)
+            gameOverButton("Play Again", "arrow.clockwise") { session.restart() }
         }
-        // Icon over title, so "Analyse" and "Play Again" fit three abreast
-        // on a phone instead of breaking mid-word.
-        .labelStyle(StackedLabelStyle())
-        .controlSize(.large)
-        .font(.subheadline.weight(.semibold))
+        .padding(4)
+        .gameOverGlass()
+        .fixedSize()
+    }
+
+    private func gameOverButton(_ title: String, _ symbol: String, prominent: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: symbol)
+                .labelStyle(.titleAndIcon)
+                .font(.subheadline.weight(prominent ? .semibold : .medium))
+                .foregroundStyle(prominent ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                .lineLimit(1)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -422,13 +418,15 @@ extension String {
     var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }
 
-/// Symbol above a one-line title, for a row of equal buttons.
-struct StackedLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        VStack(spacing: 4) {
-            configuration.icon.font(.title3)
-            configuration.title.lineLimit(1).minimumScaleFactor(0.8)
-        }
-        .padding(.vertical, 2)
+private extension View {
+    /// The capsule the end-of-game actions share: Liquid Glass where there is
+    /// some, the system glass material on visionOS.
+    @ViewBuilder
+    func gameOverGlass() -> some View {
+        #if os(visionOS)
+        glassBackgroundEffect(in: .capsule)
+        #else
+        glassEffect(.regular.interactive(), in: .capsule)
+        #endif
     }
 }
