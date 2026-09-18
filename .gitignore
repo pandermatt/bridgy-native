@@ -6,3 +6,4 @@ DerivedData/
 *.xcworkspace
 !*.xcworkspace/contents.xcworkspacedata
 xcuserdata/
+build/

@@ -20,22 +20,52 @@ final class TournamentRun {
     private var task: Task<Void, Never>?
     private static let publishInterval = Duration.milliseconds(120)
 
-    /// The field. Each engine is rebuilt for every board size it plays.
-    var participants: [Participant] { Tournament.defaultParticipants() }
+    /// Built-in levels taking part.
+    var levels: Set<Difficulty> = Set(Difficulty.allCases)
+    /// Saved agents sitting this one out. Kept as exclusions so a newly
+    /// trained agent is in the field without anyone having to add it.
+    var benchedAgents: Set<UUID> = []
 
-    var totalGames: Int {
-        configuration.totalGames(participants: participants.count)
+    func entered(_ agents: [SavedAgent]) -> [SavedAgent] {
+        agents.filter { !benchedAgents.contains($0.id) }
     }
+
+    /// The field: the chosen levels in ladder order, then the chosen agents.
+    /// Each level is rebuilt for every board size it plays; an agent's
+    /// network plays every size as it is.
+    func participants(store: AgentStore) -> [Participant] {
+        let builtIn = Tournament.defaultParticipants().enumerated()
+            .filter { levels.contains(Difficulty.allCases[$0.offset]) }
+            .map(\.element)
+        let trained = entered(store.agents).compactMap { agent -> Participant? in
+            guard let weights = try? store.weights(for: agent) else { return nil }
+            return Participant(name: agent.name, engine: agent.engine(weights: weights))
+        }
+        return builtIn + trained
+    }
+
+    func fieldSize(store: AgentStore) -> Int {
+        levels.count + entered(store.agents).count
+    }
+
+    func totalGames(store: AgentStore) -> Int {
+        configuration.totalGames(participants: fieldSize(store: store))
+    }
+
+    /// Games in the run under way, fixed when it started.
+    private(set) var scheduledGames = 0
 
     var progress: Double {
-        guard let analysis, totalGames > 0 else { return 0 }
-        return min(1, Double(analysis.gamesPlayed) / Double(totalGames))
+        guard let analysis, scheduledGames > 0 else { return 0 }
+        return min(1, Double(analysis.gamesPlayed) / Double(scheduledGames))
     }
 
-    func start() {
+    func start(store: AgentStore) {
         stop()
         let settings = configuration
-        let participants = participants
+        let participants = participants(store: store)
+        guard participants.count >= 2 else { return }
+        scheduledGames = settings.totalGames(participants: participants.count)
         var working = TournamentAnalysis(
             participants: participants.map(\.name),
             configuration: settings

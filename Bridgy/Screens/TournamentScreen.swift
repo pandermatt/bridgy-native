@@ -1,4 +1,5 @@
 import BridgyEngine
+import BridgyTraining
 import Charts
 import SwiftUI
 
@@ -15,6 +16,7 @@ struct TournamentScreen: View {
     var body: some View {
         Form {
             setupSection
+            participantsSection
             if let analysis = run.analysis, analysis.gamesPlayed > 0 {
                 ratingsSection(analysis)
                 sizeSection(analysis)
@@ -62,7 +64,7 @@ struct TournamentScreen: View {
             if run.isRunning {
                 VStack(alignment: .leading, spacing: 6) {
                     ProgressView(value: run.progress)
-                    Text("\(run.analysis?.gamesPlayed ?? 0) of \(run.totalGames) games")
+                    Text("\(run.analysis?.gamesPlayed ?? 0) of \(run.scheduledGames) games")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -76,17 +78,64 @@ struct TournamentScreen: View {
                 .buttonStyle(.bordered)
                 .controlSize(.large)
             } else {
-                Button { run.start() } label: {
-                    Text("Run \(run.totalGames) Games").frame(maxWidth: .infinity)
+                Button { run.start(store: model.agents) } label: {
+                    Text("Run \(run.totalGames(store: model.agents)) Games").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+                .disabled(run.fieldSize(store: model.agents) < 2)
             }
         } header: {
             Text("Setup")
         } footer: {
-            Text("Every difficulty plays every other, in both colours, at each board size. Win rates carry 95% Wilson intervals, so small samples look small.")
+            Text("Everyone in the field plays everyone else, in both colours, at each board size. Win rates carry 95% Wilson intervals, so small samples look small.")
         }
+    }
+
+    // MARK: - Participants
+
+    private var participantsSection: some View {
+        Section {
+            ForEach(Difficulty.allCases) { level in
+                Toggle(isOn: Binding(
+                    get: { run.levels.contains(level) },
+                    set: { if $0 { run.levels.insert(level) } else { run.levels.remove(level) } }
+                )) {
+                    Label(level.displayName, systemImage: level.symbolName)
+                }
+            }
+            ForEach(model.agents.agents) { agent in
+                Toggle(isOn: Binding(
+                    get: { !run.benchedAgents.contains(agent.id) },
+                    set: { if $0 { run.benchedAgents.remove(agent.id) } else { run.benchedAgents.insert(agent.id) } }
+                )) {
+                    Label {
+                        VStack(alignment: .leading) {
+                            Text(agent.name)
+                            Text(agent.summary).font(.caption).foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "brain")
+                    }
+                }
+            }
+            NavigationLink {
+                TrainingScreen(run: model.training)
+            } label: {
+                LabeledContent {
+                    if model.training.isRunning {
+                        Text("Round \(model.training.round) of \(model.training.roundsPlanned)").monospacedDigit()
+                    }
+                } label: {
+                    Label("Train an Agent", systemImage: "brain.head.profile")
+                }
+            }
+        } header: {
+            Text("Participants")
+        } footer: {
+            Text("Agents you train join the field here. They search \(TrainingParameters().simulations) positions a move by default, so on large boards their games take a while.")
+        }
+        .disabled(run.isRunning)
     }
 
     // MARK: - Ratings

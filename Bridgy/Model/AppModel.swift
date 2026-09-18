@@ -10,6 +10,10 @@ final class AppModel {
     let settings = AppSettings()
     let sound = SoundGenerator()
     let store = GameStore()
+    let agents = AgentStore()
+    /// Lives here rather than on its screen so training carries on while you
+    /// look at something else.
+    let training = TrainingRun()
 
     /// The live game, if one is on screen.
     var session: GameSession?
