@@ -29,6 +29,20 @@ struct BridgyApp: App {
                     .keyboardShortcut("z", modifiers: .command)
                     .disabled(model.session?.canUndo != true)
             }
+            CommandGroup(after: .sidebar) {
+                ForEach(Array(AppTab.sidebar.prefix(4).enumerated()), id: \.element) { index, tab in
+                    Button(tab.title) { model.requestedTab = tab }
+                        .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
+                }
+            }
+            CommandMenu("Lab") {
+                Button("Show Experiments") { model.requestedTab = .lab }
+                Button("Stop Experiment") { model.runner.stop(library: model.library) }
+                    .keyboardShortcut(".", modifiers: .command)
+                    .disabled(!model.runner.isRunning)
+                Divider()
+                Button("Train an Agent…") { model.requestedTab = .agents }
+            }
             CommandMenu("Game") {
                 Button("Restart") { model.session?.restart() }
                     .keyboardShortcut("r", modifiers: .command)

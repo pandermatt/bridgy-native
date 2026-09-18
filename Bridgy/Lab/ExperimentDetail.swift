@@ -148,7 +148,6 @@ struct ExperimentDetail: View {
                 Button(role: .destructive) { model.runner.stop(library: model.library) } label: {
                     Label("Stop", systemImage: "stop.fill")
                 }
-                .keyboardShortcut(".", modifiers: .command)
             } else {
                 Button { model.runner.start(experiment, library: model.library, agents: model.agents) } label: {
                     Label(experiment.gamesPlayed > 0 ? "Run Again" : "Run", systemImage: "play.fill")
