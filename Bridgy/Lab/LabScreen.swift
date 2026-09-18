@@ -24,7 +24,9 @@ struct LabScreen: View {
                         }
                     }
                 }
-                if !library.experiments.isEmpty {
+                if library.experiments.isEmpty {
+                    emptyState
+                } else {
                     Section {
                         ForEach(library.experiments) { experiment in
                             NavigationLink(value: experiment.id) { row(experiment) }
@@ -40,12 +42,9 @@ struct LabScreen: View {
                     } header: {
                         Text("Your experiments")
                     } footer: {
-                        Text("Start another with +.")
+                        Text("Start another with +")
                     }
                 }
-            }
-            .overlay {
-                if library.experiments.isEmpty { emptyState }
             }
             .navigationTitle("Lab")
             .navigationDestination(for: UUID.self) { id in
@@ -113,40 +112,48 @@ struct LabScreen: View {
         library.delete(experiment.id)
     }
 
-    /// No experiments yet: what + does, and what each kind is for.
+    /// No experiments yet: what + does, and what each kind is for. Laid out
+    /// flush left, as a page of the list rather than a centred placeholder.
     private var emptyState: some View {
-        ContentUnavailableView {
-            Label("No Experiments Yet", systemImage: "flask")
-        } description: {
-            VStack(spacing: 16) {
-                Text("Press + to start one. There are three kinds:")
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(Experiment.Kind.allCases) { kind in
-                        HStack(alignment: .firstTextBaseline, spacing: 10) {
-                            Image(systemName: kind.symbol)
-                                .foregroundStyle(.tint)
-                                .frame(width: 24)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(kind.title).font(.headline).foregroundStyle(.primary)
-                                Text(kind.summary).font(.callout)
-                            }
+        Section {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("No Experiments Yet")
+                        .font(.title2.weight(.bold))
+                    Text("Press + to start one. There are three kinds:")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(Experiment.Kind.allCases) { kind in
+                    HStack(alignment: .top, spacing: 14) {
+                        Image(systemName: kind.symbol)
+                            .font(.title3)
+                            .foregroundStyle(.tint)
+                            .frame(width: 32, alignment: .center)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(kind.title).font(.headline)
+                            Text(kind.summary)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
-                .multilineTextAlignment(.leading)
-                Text("Every game is kept, seeded and replayable, so any result can be checked or reproduced.")
+                Menu {
+                    newExperimentItems
+                } label: {
+                    Label("New Experiment", systemImage: "plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                Text("Every game is kept, seeded and replayable, so any result can be checked or reproduced")
                     .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: 440)
-        } actions: {
-            Menu {
-                newExperimentItems
-            } label: {
-                Label("New Experiment", systemImage: "plus")
-            }
-            .buttonStyle(.borderedProminent)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
         }
-        .padding(.top, showsAgentsLink ? 60 : 0)
     }
 
     @ViewBuilder
