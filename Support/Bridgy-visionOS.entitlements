@@ -2,11 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Shared with the widget, which shows the game in progress. -->
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.ch.pandermatt.bridgy</string>
-	</array>
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>
 		<string>iCloud.ch.pandermatt.bridgy</string>

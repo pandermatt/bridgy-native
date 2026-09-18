@@ -94,6 +94,25 @@ struct SettingsScreen: View {
                 #endif
             }
 
+            if CloudSync.isAvailable {
+                Section {
+                    Toggle("Sync with iCloud", isOn: Binding(
+                        get: { settings.syncsWithICloud },
+                        set: { settings.syncsWithICloud = $0; model.updateSync() }
+                    ))
+                    if settings.syncsWithICloud {
+                        LabeledContent("Status") {
+                            Text(model.cloud.status.text).multilineTextAlignment(.trailing)
+                        }
+                        Button("Sync Now") { model.cloud.syncNow() }
+                    }
+                } header: {
+                    Text("iCloud")
+                } footer: {
+                    Text("Your agents, experiments, finished games and the game in progress, on every device signed in to your iCloud account.")
+                }
+            }
+
             VictorySongSection(settings: settings)
 
             Section {

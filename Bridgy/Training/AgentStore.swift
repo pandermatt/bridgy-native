@@ -49,6 +49,8 @@ final class AgentStore {
     private(set) var agents: [SavedAgent] = []
     private let directory: URL
     /// Networks already read from disk, by agent and the save they came from.
+    /// Told about every local change, for iCloud sync.
+    @ObservationIgnored var onChange: ((SyncChange) -> Void)?
     @ObservationIgnored private var networks: [UUID: (updated: Date, network: NeuralNetwork)] = [:]
 
     init() {
@@ -85,6 +87,7 @@ final class AgentStore {
         } else {
             agents.append(agent)
         }
+        onChange?(.agentSaved(agent.id))
     }
 
     /// Rewrites the description only; the weights are untouched.
@@ -92,6 +95,29 @@ final class AgentStore {
         guard let data = try? JSONEncoder().encode(agent) else { return }
         try? data.write(to: folder(agent.id).appendingPathComponent("agent.json"), options: .atomic)
         if let index = agents.firstIndex(where: { $0.id == agent.id }) { agents[index] = agent }
+        onChange?(.agentSaved(agent.id))
+    }
+
+    func weightsURL(for id: UUID) -> URL { folder(id).appendingPathComponent("weights.bin") }
+
+    /// An agent from iCloud: saved as it came, without echoing back.
+    func applyRemote(_ agent: SavedAgent, weights: Data) throws {
+        let folder = folder(agent.id)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try weights.write(to: folder.appendingPathComponent("weights.bin"), options: .atomic)
+        try JSONEncoder().encode(agent).write(to: folder.appendingPathComponent("agent.json"), options: .atomic)
+        networks[agent.id] = nil
+        if let index = agents.firstIndex(where: { $0.id == agent.id }) {
+            agents[index] = agent
+        } else {
+            agents.append(agent)
+            agents.sort { $0.created < $1.created }
+        }
+    }
+
+    func removeRemote(_ id: UUID) {
+        try? FileManager.default.removeItem(at: folder(id))
+        agents.removeAll { $0.id == id }
     }
 
     func weights(for agent: SavedAgent) throws -> NetworkWeights {
@@ -153,6 +179,7 @@ final class AgentStore {
     func delete(_ agent: SavedAgent) {
         try? FileManager.default.removeItem(at: folder(agent.id))
         agents.removeAll { $0.id == agent.id }
+        onChange?(.agentDeleted(agent.id))
     }
 
     /// "Agent 1", "Agent 2", … skipping names already taken.

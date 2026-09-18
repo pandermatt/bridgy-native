@@ -70,6 +70,7 @@ targets:
         INFOPLIST_FILE[sdk=macosx*]: Support/AppInfo.plist
         INFOPLIST_KEY_NSSupportsLiveActivities[sdk=iphone*]: YES
         CODE_SIGN_ENTITLEMENTS[sdk=iphone*]: Support/Bridgy-iOS.entitlements
+        CODE_SIGN_ENTITLEMENTS[sdk=xr*]: Support/Bridgy-visionOS.entitlements
         # Opened agent files are copied in, not edited where they lie. macOS
         # refuses NO here, so it is set for iPhone and iPad only.
         INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace[sdk=iphone*]: NO

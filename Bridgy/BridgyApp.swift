@@ -5,6 +5,7 @@ import SwiftUI
 @main
 struct BridgyApp: App {
     @State private var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let model = AppModel()
@@ -18,7 +19,13 @@ struct BridgyApp: App {
         WindowGroup {
             AppRoot()
                 .environment(model)
-                .task { model.prepareAudio() }
+                .task {
+                    model.prepareAudio()
+                    model.updateSync()
+                }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active { model.cloud.syncNow() }
+                }
         }
         .commands {
             CommandGroup(replacing: .newItem) {

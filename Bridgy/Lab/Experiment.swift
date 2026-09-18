@@ -192,6 +192,8 @@ final class ExperimentLibrary {
     private(set) var experiments: [Experiment] = []
     private let directory: URL
     @ObservationIgnored private var gameCache: [UUID: [GameRecord]] = [:]
+    /// Told about every local change, for iCloud sync.
+    @ObservationIgnored var onChange: ((SyncChange) -> Void)?
 
     init() {
         let base = (try? FileManager.default.url(
@@ -235,6 +237,27 @@ final class ExperimentLibrary {
         } else {
             experiments.insert(experiment, at: 0)
         }
+        // Not while it runs: saves every few seconds would upload the same
+        // growing file over and over. The finished experiment goes up once.
+        if experiment.status != .running { onChange?(.experimentSaved(experiment.id)) }
+    }
+
+    func gamesURL(for id: UUID) -> URL { folder(id).appendingPathComponent("games.json") }
+
+    /// An experiment from iCloud, saved without echoing back.
+    func applyRemote(_ experiment: Experiment, games: Data?) {
+        let callback = onChange
+        onChange = nil
+        defer { onChange = callback }
+        let decoded = games.flatMap { try? JSONDecoder().decode([GameRecord].self, from: $0) }
+        save(experiment, games: decoded)
+        experiments.sort { $0.created > $1.created }
+    }
+
+    func removeRemote(_ id: UUID) {
+        try? FileManager.default.removeItem(at: folder(id))
+        experiments.removeAll { $0.id == id }
+        gameCache[id] = nil
     }
 
     func games(for id: UUID) -> [GameRecord] {
@@ -249,6 +272,7 @@ final class ExperimentLibrary {
         try? FileManager.default.removeItem(at: folder(id))
         experiments.removeAll { $0.id == id }
         gameCache[id] = nil
+        onChange?(.experimentDeleted(id))
     }
 
     func rename(_ id: UUID, to name: String) {

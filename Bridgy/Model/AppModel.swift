@@ -108,6 +108,13 @@ final class AppModel {
 
     var canResume: Bool { resumable != nil }
 
+    /// iCloud sync, when the setting is on and the platform has it.
+    @ObservationIgnored lazy var cloud = CloudSync(model: self)
+
+    func updateSync() {
+        if settings.syncsWithICloud, CloudSync.isAvailable { cloud.start() } else { cloud.stop() }
+    }
+
     // MARK: - The table (Vision Pro)
 
     /// The game while it is being played on the table in the room: where it

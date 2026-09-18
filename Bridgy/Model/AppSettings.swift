@@ -21,6 +21,8 @@ final class AppSettings {
     /// Offer a song with a short Apple Music preview after a win. Off until
     /// asked for: it needs Apple Music access.
     var suggestsVictorySong: Bool { didSet { store(suggestsVictorySong, "suggestsVictorySong") } }
+    /// Keep agents, experiments and games in step across devices via iCloud.
+    var syncsWithICloud: Bool { didSet { store(syncsWithICloud, "syncsWithICloud") } }
     /// Puzzles finished, and how many of them were solved.
     var puzzlesSolved: Int { didSet { store(puzzlesSolved, "puzzlesSolved") } }
     var puzzlesTried: Int { didSet { store(puzzlesTried, "puzzlesTried") } }
@@ -71,6 +73,7 @@ final class AppSettings {
         highlightsWinningPath = defaults.object(forKey: "highlightsWinningPath") as? Bool ?? true
         hasSeenWelcome = defaults.object(forKey: "hasSeenWelcome") as? Bool ?? false
         showsSiriHintTip = defaults.object(forKey: "showsSiriHintTip") as? Bool ?? true
+        syncsWithICloud = defaults.object(forKey: "syncsWithICloud") as? Bool ?? true
         puzzlesSolved = defaults.integer(forKey: "puzzlesSolved")
         puzzlesTried = defaults.integer(forKey: "puzzlesTried")
         suggestsVictorySong = defaults.object(forKey: "suggestsVictorySong") as? Bool ?? false

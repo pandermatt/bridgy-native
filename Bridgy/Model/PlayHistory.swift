@@ -28,6 +28,8 @@ final class PlayHistory {
     private(set) var games: [PlayedGame] = []
     private let url: URL
     private static let limit = 1_000
+    /// Told about every local change, for iCloud sync.
+    @ObservationIgnored var onChange: ((SyncChange) -> Void)?
 
     init() {
         let base = (try? FileManager.default.url(
@@ -61,12 +63,34 @@ final class PlayHistory {
             }
         }
         if games.count > Self.limit { games.removeLast(games.count - Self.limit) }
-        if let data = try? JSONEncoder().encode(games) { try? data.write(to: url, options: .atomic) }
+        persist()
+        onChange?(.gameSaved(game.id))
         return game
     }
 
     func delete(_ game: PlayedGame) {
         games.removeAll { $0.id == game.id }
+        persist()
+        onChange?(.gameDeleted(game.id))
+    }
+
+    func game(_ id: UUID) -> PlayedGame? { games.first { $0.id == id } }
+
+    /// A game from iCloud, placed by date, without echoing back.
+    func merge(_ game: PlayedGame) {
+        games.removeAll { $0.id == game.id }
+        let index = games.firstIndex { $0.date < game.date } ?? games.endIndex
+        games.insert(game, at: index)
+        if games.count > Self.limit { games.removeLast(games.count - Self.limit) }
+        persist()
+    }
+
+    func removeRemote(_ id: UUID) {
+        games.removeAll { $0.id == id }
+        persist()
+    }
+
+    private func persist() {
         if let data = try? JSONEncoder().encode(games) { try? data.write(to: url, options: .atomic) }
     }
 }

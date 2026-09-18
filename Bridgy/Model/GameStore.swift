@@ -36,9 +36,22 @@ struct GameStore: Sendable {
     func save(_ snapshot: Snapshot) {
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         try? data.write(to: url, options: .atomic)
+        NotificationCenter.default.post(name: .bridgyCurrentGameSaved, object: nil)
     }
+
+    /// A game in progress from iCloud; saved without echoing back.
+    func applyRemote(_ data: Data) {
+        try? data.write(to: url, options: .atomic)
+    }
+
+    func data() -> Data? { try? Data(contentsOf: url) }
 
     func clear() {
         try? FileManager.default.removeItem(at: url)
     }
+}
+
+extension Notification.Name {
+    /// The game in progress was saved; iCloud sync picks it up.
+    static let bridgyCurrentGameSaved = Notification.Name("bridgyCurrentGameSaved")
 }
