@@ -16,18 +16,28 @@ final class PlayableGaps: Sendable {
     private struct Contents {
         var owners: [EquipmentIdentifier: BoardSide] = [:]
         var destinations: [BoardSide: [EquipmentIdentifier]] = [:]
+        /// Set while the board is being placed or carried: no bridge may be
+        /// picked up then, so a drag on the shore never becomes a move.
+        var paused = false
     }
     private let storage = Mutex(Contents())
 
     func republish(owners: [EquipmentIdentifier: BoardSide], destinations: [BoardSide: [EquipmentIdentifier]]) {
-        storage.withLock { $0 = Contents(owners: owners, destinations: destinations) }
+        storage.withLock {
+            $0.owners = owners
+            $0.destinations = destinations
+        }
+    }
+
+    func setPaused(_ paused: Bool) {
+        storage.withLock { $0.paused = paused }
     }
 
     /// The gaps this piece may legally be set down on, or empty when it is not
     /// this side's turn.
     func destinations(forPiece piece: EquipmentIdentifier) -> [EquipmentIdentifier] {
         storage.withLock { contents in
-            guard let side = contents.owners[piece] else { return [] }
+            guard !contents.paused, let side = contents.owners[piece] else { return [] }
             return contents.destinations[side] ?? []
         }
     }

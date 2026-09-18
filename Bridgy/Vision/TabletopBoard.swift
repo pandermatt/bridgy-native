@@ -585,4 +585,13 @@ private extension UIColor {
         )
     }
 }
+
+extension TabletopBoard {
+    /// While the person decides where the board goes it is half there — see
+    /// through, so it reads as a preview rather than a game already underway.
+    @MainActor
+    func setPlacing(_ placing: Bool) {
+        root.components.set(OpacityComponent(opacity: placing ? 0.6 : 1))
+    }
+}
 #endif
